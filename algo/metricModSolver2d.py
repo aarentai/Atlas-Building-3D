@@ -797,7 +797,6 @@ def compute_alpha_derivs_orig(alpha, mask):
       
         elif mask[ii-1,jj] and mask[ii+1,jj] and mask[ii,jj-1] and (not mask[ii,jj+1]): # top boundary
           alpha_gradY[ii,jj] = alpha_gradY_top[ii,jj]
-          alpha_gradY[ii,jj] = alpha_gradY_top[ii,jj]
       
         elif (not mask[ii-1,jj]) and (not mask[ii+1,jj]) and mask[ii,jj-1] and (not mask[ii,jj+1]): # notbottom boundary
           alpha_gradX[ii,jj] = 0

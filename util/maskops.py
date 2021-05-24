@@ -25,6 +25,14 @@ def is_3_in_a_row_3d(ii, jj, kk, mask, axis=0):
   else: #axis == 2
     return(mask[ii,jj,kk-1] + mask[ii,jj,kk] + mask[ii,jj,kk+1] == 3)
 
+def is_offset_in_mask_3d(ii, jj, kk, offs, mask):
+  in_mask = True
+  for off in offs:
+    if mask[ii+off[0],jj+off[1],kk+off[2]] == 0:
+      in_mask = False
+      break
+  return(in_mask)
+
 def determine_boundary_2d(mask):
   # Classify boundary points of mask
   # WARNING!  This method modifies the mask as well, by setting values to 0 for any boundary type
@@ -160,7 +168,7 @@ def determine_boundary_2d(mask):
   return(bdry_type, bdry_idx, bdry_map)
 # end determine_boundary_2d
 
-def determine_boundary_3d(mask):
+def determine_boundary_3d(mask, modify_mask=True):
   # Classify boundary points of mask
   # WARNING!  This method modifies the mask as well, by setting values to 0 for any boundary type
   #  that cannot be differentiated accurately (currently).
@@ -178,10 +186,16 @@ def determine_boundary_3d(mask):
   bdry_map = {}
   bdry_map["outside"] = 0
   bdry_map["interior"] = 1
+  # num_known_bdrys = 2
   bdry_map["interiorleft"] = 2
   bdry_map["interiorright"] = 3
   bdry_map["interiorbottom"] = 4
   bdry_map["interiortop"] = 5
+  bdry_map["interiorrear"] = 6
+  bdry_map["interiorfront"] = 7
+  num_known_bdrys = 8
+
+  # TODO Delete below, note that numbering is off and also auto determined from following code
   # bdry_map["left"] = 6
   # bdry_map["right"] = 7
   # bdry_map["bottom"] = 8
@@ -194,8 +208,6 @@ def determine_boundary_3d(mask):
   # bdry_map["shiftyright"] = 15
   # bdry_map["bottomshiftx"] = 16
   # bdry_map["topshiftx"] = 17
-  # bdry_map["interiorrear"] = 18
-  # bdry_map["interiorfront"] = 19
   # bdry_map["rear"] = 20
   # bdry_map["front"] = 21
   # bdry_map["rearleft"] = 22
@@ -238,7 +250,9 @@ def determine_boundary_3d(mask):
   # bdry_map["shiftzbottomright"] = 59
   # bdry_map["shiftztopleft"] = 60
   # bdry_map["shiftztopright"] = 61
-  num_known_bdrys = 6
+
+  num_red = 0
+  num_no = 0
   
   for ii in range(xsz):
     for jj in range(ysz):
@@ -282,73 +296,348 @@ def determine_boundary_3d(mask):
                   and mask[ii,jj-1,kk-1] and mask[ii,jj+1,kk-1]):
               # interior front
               bdry_type[ii,jj,kk] = bdry_map["interiorfront"]
+           # bdry_name = ''
+           # if mask[ii,jj+1,kk+1]:
+           #   bdry_name += "interiorrearbottom"
+           # elif mask[ii,jj-1,kk+1]:
+           #   bdry_name += "interiorreartop"
+           # elif mask[ii,jj+1,kk-1]:
+           #   bdry_name += "interiorfrontbottom"
+           # elif mask[ii,jj-1,kk-1]:
+           #   bdry_name += "interiorfronttop"
+           # else:
+           #   print('unexpected interior case A at', ii, jj, kk)
+           # if mask[ii+1,jj,kk+1]:
+           #   bdry_name += "interiorrearleft"
+           # elif mask[ii-1,jj,kk+1]:
+           #   bdry_name += "interiorrearright"
+           # elif mask[ii+1,jj,kk-1]:
+           #   bdry_name += "interiorfrontleft"
+           # elif mask[ii-1,jj,kk-1]:
+           #   bdry_name += "interiorfrontright"
+           # else:
+           #   print('unexpected interior case B at', ii, jj, kk)
+           # if mask[ii+1,jj+1,kk]: 
+           #   bdry_name += "interiorbottomleft"
+           # elif mask[ii-1,jj+1,kk]: 
+           #   bdry_name += "interiorbottomright"
+           # elif mask[ii+1,jj-1,kk]: 
+           #   bdry_name += "interiortopleft"
+           # elif mask[ii-1,jj-1,kk]: 
+           #   bdry_name += "interiortopright"
+           # else:
+           #   print('unexpected interior case C at', ii, jj, kk)
+           # # if (mask[ii,jj-1,kk+1] and mask[ii,jj+1,kk-1]):
+           # #   bdry_name += "interiorreartop" # same as frontbottom
+           # # elif (mask[ii,jj+1,kk+1] and mask[ii,jj-1,kk-1]):
+           # #   bdry_name += "interiorrearbottom" # same as fronttop
+           # # elif (mask[ii,jj+1,kk+1] and mask[ii,jj+1,kk-1]): 
+           # #   bdry_name += "interiorzbottom" 
+           # # elif (mask[ii,jj+1,kk+1] and mask[ii,jj-1,kk+1]): 
+           # #   bdry_name += "interiorreary"
+           # # elif (mask[ii,jj-1,kk-1] and mask[ii,jj-1,kk+1]): 
+           # #   bdry_name += "interiorztop"
+           # # elif (mask[ii,jj-1,kk-1] and mask[ii,jj+1,kk-1]): 
+           # #   bdry_name += "interiorfronty" 
+           # # else:
+           # #   print('unexpected interior case A at', ii, jj, kk)
+           # # if (mask[ii-1,jj,kk+1] and mask[ii+1,jj,kk-1]):
+           # #   bdry_name += "interiorrearright" # same as frontleft
+           # # elif (mask[ii+1,jj,kk+1] and mask[ii-1,jj,kk-1]):
+           # #   bdry_name += "interiorrearleft" # same as frontright
+           # # elif (mask[ii+1,jj,kk+1] and mask[ii+1,jj,kk-1]): 
+           # #   bdry_name += "interiorzleft" 
+           # # elif (mask[ii+1,jj,kk+1] and mask[ii-1,jj,kk+1]): 
+           # #   bdry_name += "interiorrearx"
+           # # elif (mask[ii-1,jj,kk-1] and mask[ii-1,jj,kk+1]): 
+           # #   bdry_name += "interiorzright"
+           # # elif (mask[ii-1,jj,kk-1] and mask[ii+1,jj,kk-1]): 
+           # #   bdry_name += "interiorfrontx" 
+           # # else:
+           # #   print('unexpected interior case B at', ii, jj, kk)
+           # # if (mask[ii+1,jj-1,kk] and mask[ii-1,jj+1,kk]): 
+           # #   bdry_name += "interiorbottomright" # same as topleft
+           # # elif (mask[ii+1,jj+1,kk] and mask[ii-1,jj-1,kk]): 
+           # #   bdry_name += "interiorbottomleft" # same as topright
+           # # elif (mask[ii+1,jj+1,kk] and mask[ii+1,jj-1,kk]): 
+           # #   bdry_name += "interioryleft" 
+           # # elif (mask[ii+1,jj+1,kk] and mask[ii-1,jj+1,kk]): 
+           # #   bdry_name += "interiorbottomx"
+           # # elif (mask[ii-1,jj-1,kk] and mask[ii-1,jj+1,kk]): 
+           # #   bdry_name += "interioryright"
+           # # elif (mask[ii-1,jj-1,kk] and mask[ii+1,jj-1,kk]): 
+           # #   bdry_name += "interiortopx" 
+           # # else:
+           # #   print('unexpected interior case C at', ii, jj, kk)
+           # if bdry_name not in bdry_map:
+           #   bdry_map[bdry_name] = num_known_bdrys
+           #   num_known_bdrys += 1
+           # bdry_type[ii,jj,kk] = bdry_map[bdry_name]     
+           
         
           else:
             # build things up, z to x direction
             bdry_name = ''
             if is_3_in_a_row_3d(ii, jj, kk, mask, 2):
               # interior pt z dir
-              bdry_name += ''
+              bdry_name += 'intz'
             elif is_3_in_a_row_3d(ii, jj, kk+1, mask, 2):
               bdry_name += 'rear'
             elif is_3_in_a_row_3d(ii, jj, kk-1, mask, 2):
               bdry_name += 'front'
-            elif (is_3_in_a_row_3d(ii+1, jj, kk, mask, 2) or is_3_in_a_row_3d(ii-1, jj, kk, mask, 2) or
-                  is_3_in_a_row_3d(ii, jj+1, kk, mask, 2) or is_3_in_a_row_3d(ii, jj-1, kk, mask, 2)):
-              bdry_name += 'shiftz'
-            elif (is_3_in_a_row_3d(ii+1, jj, kk+1, mask, 2) or is_3_in_a_row_3d(ii-1, jj, kk+1, mask, 2) or
-                  is_3_in_a_row_3d(ii, jj+1, kk+1, mask, 2) or is_3_in_a_row_3d(ii, jj-1, kk+1, mask, 2)):
-              bdry_name += 'shiftrear'
-            elif (is_3_in_a_row_3d(ii+1, jj, kk-1, mask, 2) or is_3_in_a_row_3d(ii-1, jj, kk-1, mask, 2) or
-                  is_3_in_a_row_3d(ii, jj+1, kk-1, mask, 2) or is_3_in_a_row_3d(ii, jj-1, kk-1, mask, 2)):
-              bdry_name += 'shiftfront'
+            elif is_3_in_a_row_3d(ii+1, jj, kk, mask, 2) and is_3_in_a_row_3d(ii+2, jj, kk, mask, 2):
+              if is_offset_in_mask_3d(ii, jj, kk, [[3,0,0],[3,0,-1]], mask):
+                # Can do more accurate 2nd derivative
+                bdry_name += 'shiftztol'
+              else:
+                # Must do reduced accuracy 2nd derivative
+                bdry_name += 'shiftztolred'
+            elif is_3_in_a_row_3d(ii-1, jj, kk, mask, 2) and is_3_in_a_row_3d(ii-2, jj, kk, mask, 2):
+              if is_offset_in_mask_3d(ii, jj, kk, [[-3,0,0],[-3,0,-1]], mask):
+                bdry_name += 'shiftztori'
+              else:
+                bdry_name += 'shiftztorired'
+            elif is_3_in_a_row_3d(ii, jj+1, kk, mask, 2) and is_3_in_a_row_3d(ii, jj+2, kk, mask, 2):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,3,0],[0,3,-1]], mask):
+                bdry_name += 'shiftztob'
+              else:
+                bdry_name += 'shiftztobred'
+            elif is_3_in_a_row_3d(ii, jj-1, kk, mask, 2) and is_3_in_a_row_3d(ii, jj-2, kk, mask, 2):
+              if is_offset_in_mask_3d(ii, jj, kk, [[-3,0,0],[-3,0,-1]], mask):
+                bdry_name += 'shiftztot'
+              else:
+                bdry_name += 'shiftztotred'
+            #elif is_3_in_a_row_3d(ii+1, jj, kk, mask, 0) and is_3_in_a_row_3d(ii+1, jj, kk+1, mask, 2):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[1,0,1],[1,0,2],[2,0,1],[2,0,0],[1,0,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[2,0,2],[3,0,0],[3,0,1]], mask):
+                bdry_name += 'shiftreartol'
+              else:
+                bdry_name += 'shiftreartolred'
+            #elif is_3_in_a_row_3d(ii-1, jj, kk, mask, 0) and is_3_in_a_row_3d(ii-1, jj, kk+1, mask, 2):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[-1,0,1],[-1,0,2],[-2,0,1],[-2,0,0],[-1,0,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[-2,0,2],[-3,0,0],[-3,0,1]], mask):
+                bdry_name += 'shiftreartori'
+              else:
+                bdry_name += 'shiftreartorired'
+            #elif is_3_in_a_row_3d(ii, jj+1, kk, mask, 1) and is_3_in_a_row_3d(ii, jj+1, kk+1, mask, 2):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[0,1,1],[0,1,2],[0,2,1],[0,2,0],[0,1,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,2,2],[0,3,0],[0,3,1]], mask):
+                bdry_name += 'shiftreartob'
+              else:
+                bdry_name += 'shiftreartobred'
+            #elif is_3_in_a_row_3d(ii, jj-1, kk, mask, 1) and is_3_in_a_row_3d(ii, jj-1, kk+1, mask, 2):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[0,-1,1],[0,-1,2],[0,-2,1],[0,-2,0],[0,-1,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,-2,2],[0,-3,0],[0,-3,1]], mask):
+                bdry_name += 'shiftreartot'
+              else:
+                bdry_name += 'shiftreartotred'
+            #elif is_3_in_a_row_3d(ii+1, jj, kk, mask, 0) and is_3_in_a_row_3d(ii+1, jj, kk-1, mask, 2):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[1,0,-1],[1,0,-2],[2,0,-1],[2,0,0],[1,0,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[2,0,-2],[3,0,0],[3,0,-1]], mask):
+                bdry_name += 'shiftfronttol'
+              else:
+                bdry_name += 'shiftfronttolred'
+            #elif is_3_in_a_row_3d(ii-1, jj, kk, mask, 0) and is_3_in_a_row_3d(ii-1, jj, kk-1, mask, 2):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[-1,0,-1],[-1,0,-2],[-2,0,-1],[-2,0,0],[-1,0,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[-2,0,-2],[-3,0,0],[-3,0,-1]], mask):
+                bdry_name += 'shiftfronttori'
+              else:
+                bdry_name += 'shiftfronttorired'
+            #elif is_3_in_a_row_3d(ii, jj+1, kk, mask, 1) and is_3_in_a_row_3d(ii, jj+1, kk-1, mask, 2):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[0,1,-1],[0,1,-2],[0,2,-1],[0,2,0],[0,1,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,2,-2],[0,3,0],[0,3,-1]], mask):
+                bdry_name += 'shiftfronttob'
+              else:
+                bdry_name += 'shiftfronttobred'
+            #elif is_3_in_a_row_3d(ii, jj-1, kk, mask, 1) and is_3_in_a_row_3d(ii, jj-1, kk-1, mask, 2):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[0,-1,-1],[0,-1,-2],[0,-2,-1],[0,-2,0],[0,-1,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,-2,-2],[0,-3,0],[0,-3,-1]], mask):
+                bdry_name += 'shiftfronttot'
+              else:
+                bdry_name += 'shiftfronttotred'
             else:
               bdry_name += 'noz'
             if is_3_in_a_row_3d(ii, jj, kk, mask, 1):
               # interior pt y dir
-              bdry_name += ''
+              bdry_name += 'inty'
             elif is_3_in_a_row_3d(ii, jj+1, kk, mask, 1):
               bdry_name += 'bottom'
             elif is_3_in_a_row_3d(ii, jj-1, kk, mask, 1):
               bdry_name += 'top'
-            elif (is_3_in_a_row_3d(ii+1, jj, kk, mask, 1) or is_3_in_a_row_3d(ii-1, jj, kk, mask, 1) or
-                  is_3_in_a_row_3d(ii, jj, kk+1, mask, 1) or is_3_in_a_row_3d(ii, jj, kk-1, mask, 1)):
-              bdry_name += 'shifty'
-            elif (is_3_in_a_row_3d(ii+1, jj+1, kk, mask, 1) or is_3_in_a_row_3d(ii-1, jj+1, kk, mask, 1) or
-                  is_3_in_a_row_3d(ii, jj+1, kk+1, mask, 1) or is_3_in_a_row_3d(ii, jj+1, kk-1, mask, 1)):
-              bdry_name += 'shiftbottom'
-            elif (is_3_in_a_row_3d(ii+1, jj-1, kk, mask, 1) or is_3_in_a_row_3d(ii-1, jj-1, kk, mask, 1) or
-                  is_3_in_a_row_3d(ii, jj-1, kk+1, mask, 1) or is_3_in_a_row_3d(ii, jj-1, kk-1, mask, 1)):
-              bdry_name += 'shifttop'
+            elif is_3_in_a_row_3d(ii+1, jj, kk, mask, 1) and is_3_in_a_row_3d(ii+2, jj, kk, mask, 1):
+              if is_offset_in_mask_3d(ii, jj, kk, [[3,0,0],[3,-1,0]], mask):
+                bdry_name += 'shiftytol'
+              else:
+                bdry_name += 'shiftytolred'
+            elif is_3_in_a_row_3d(ii-1, jj, kk, mask, 1) and is_3_in_a_row_3d(ii-2, jj, kk, mask, 1):
+              if is_offset_in_mask_3d(ii, jj, kk, [[-3,0,0],[-3,-1,0]], mask):
+                bdry_name += 'shiftytori'
+              else:
+                bdry_name += 'shiftytorired'
+            elif is_3_in_a_row_3d(ii, jj, kk+1, mask, 1) and is_3_in_a_row_3d(ii, jj, kk+2, mask, 1):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,0,3],[0,-1,3]], mask):
+                bdry_name += 'shiftytore'
+              else:
+                bdry_name += 'shiftytorered'
+            elif is_3_in_a_row_3d(ii, jj, kk-1, mask, 1) and is_3_in_a_row_3d(ii, jj, kk-2, mask, 1):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,0,-3],[0,-1,-3]], mask):
+                bdry_name += 'shiftytof'
+              else:
+                bdry_name += 'shiftytofred'
+            #elif is_3_in_a_row_3d(ii+1, jj, kk, mask, 0) and is_3_in_a_row_3d(ii+1, jj+1, kk, mask, 1):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[1,1,0],[1,2,0],[2,1,0],[2,0,0],[1,0,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[2,2,0],[3,0,0],[3,1,0]], mask):
+                bdry_name += 'shiftbottomtol'
+              else:
+                bdry_name += 'shiftbottomtolred'
+            #elif is_3_in_a_row_3d(ii-1, jj, kk, mask, 0) and is_3_in_a_row_3d(ii-1, jj+1, kk, mask, 1):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[-1,1,0],[-1,2,0],[-2,1,0],[-2,0,0],[-1,0,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[-2,2,0],[-3,0,0],[-3,1,0]], mask):
+                bdry_name += 'shiftbottomtori'
+              else:
+                bdry_name += 'shiftbottomtorired'
+            #elif is_3_in_a_row_3d(ii, jj, kk+1, mask, 2) and is_3_in_a_row_3d(ii, jj+1, kk+1, mask, 1):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[0,1,1],[0,2,1],[0,1,2],[0,0,2],[0,0,1]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,2,2],[0,0,3],[0,1,3]], mask):
+                bdry_name += 'shiftbottomtore'
+              else:
+                bdry_name += 'shiftbottomtorered'
+            #elif is_3_in_a_row_3d(ii, jj, kk-1, mask, 2) and is_3_in_a_row_3d(ii, jj+1, kk-1, mask, 1):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[0,1,-1],[0,2,-1],[0,1,-2],[0,0,-2],[0,0,-1]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,2,-2],[0,0,-3],[0,1,-3]], mask):
+                bdry_name += 'shiftbottomtof'
+              else:
+                bdry_name += 'shiftbottomtofred'
+            #elif is_3_in_a_row_3d(ii+1, jj, kk, mask, 0) and is_3_in_a_row_3d(ii+1, jj-1, kk, mask, 1):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[1,-1,0],[1,-2,0],[2,-1,0],[2,0,0],[1,0,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[2,-2,0],[3,0,0],[3,-1,0]], mask):
+                bdry_name += 'shifttoptol'
+              else:
+                bdry_name += 'shifttoptolred'
+            #elif is_3_in_a_row_3d(ii-1, jj, kk, mask, 0) and is_3_in_a_row_3d(ii-1, jj-1, kk, mask, 1):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[-1,-1,0],[-1,-2,0],[-2,-1,0],[-2,0,0],[-1,0,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[-2,-2,0],[-3,0,0],[-3,-1,0]], mask):
+                bdry_name += 'shifttoptori'
+              else:
+                bdry_name += 'shifttoptorired'
+            #elif is_3_in_a_row_3d(ii, jj, kk+1, mask, 2) and is_3_in_a_row_3d(ii, jj-1, kk+1, mask, 1):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[0,-1,1],[0,-2,1],[0,-1,2],[0,0,2],[0,0,1]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,-2,2],[0,0,3],[0,-1,3]], mask):
+                bdry_name += 'shifttoptore'
+              else:
+                bdry_name += 'shifttoptorered'
+            #elif is_3_in_a_row_3d(ii, jj, kk-1, mask, 2) and is_3_in_a_row_3d(ii, jj-1, kk-1, mask, 1):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[0,-1,-1],[0,-2,-1],[0,-1,-2],[0,0,-2],[0,0,-1]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,-2,-2],[0,0,-3],[0,-1,-3]], mask):
+                bdry_name += 'shifttoptof'
+              else:
+                bdry_name += 'shifttoptofred'
             else:
               bdry_name += 'noy'
             if is_3_in_a_row_3d(ii, jj, kk, mask, 0):
               # interior pt x dir
-              bdry_name += ''
+              bdry_name += 'intx'
             elif is_3_in_a_row_3d(ii+1, jj, kk, mask, 0):
               bdry_name += 'left'
             elif is_3_in_a_row_3d(ii-1, jj, kk, mask, 0):
               bdry_name += 'right'
-            elif (is_3_in_a_row_3d(ii, jj+1, kk, mask, 0) or is_3_in_a_row_3d(ii, jj-1, kk, mask, 0) or
-                  is_3_in_a_row_3d(ii, jj, kk+1, mask, 0) or is_3_in_a_row_3d(ii, jj, kk-1, mask, 0)):
-              bdry_name += 'shiftx'
-            elif (is_3_in_a_row_3d(ii+1, jj+1, kk, mask, 0) or is_3_in_a_row_3d(ii+1, jj-1, kk, mask, 0) or
-                  is_3_in_a_row_3d(ii+1, jj, kk+1, mask, 0) or is_3_in_a_row_3d(ii+1, jj, kk-1, mask, 0)):
-              bdry_name += 'shiftleft'
-            elif (is_3_in_a_row_3d(ii-1, jj+1, kk, mask, 0) or is_3_in_a_row_3d(ii-1, jj-1, kk, mask, 0) or
-                  is_3_in_a_row_3d(ii-1, jj, kk+1, mask, 0) or is_3_in_a_row_3d(ii-1, jj, kk-1, mask, 0)):
-              bdry_name += 'shiftright'
+            elif is_3_in_a_row_3d(ii, jj+1, kk, mask, 0) and is_3_in_a_row_3d(ii, jj+2, kk, mask, 0):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,3,0],[-1,3,0]], mask):
+                bdry_name += 'shiftxtob'
+              else:
+                bdry_name += 'shiftxtobred'
+            elif is_3_in_a_row_3d(ii, jj-1, kk, mask, 0) and is_3_in_a_row_3d(ii, jj-2, kk, mask, 0):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,-3,0],[-1,-3,0]], mask):
+                bdry_name += 'shiftxtot'
+              else:
+                bdry_name += 'shiftxtotred'
+            elif is_3_in_a_row_3d(ii, jj, kk+1, mask, 0) and is_3_in_a_row_3d(ii, jj, kk+2, mask, 0):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,0,3],[-1,0,3]], mask):
+                bdry_name += 'shiftxtore'
+              else:
+                bdry_name += 'shiftxtorered'
+            elif is_3_in_a_row_3d(ii, jj, kk-1, mask, 0) and is_3_in_a_row_3d(ii, jj, kk-2, mask, 0):
+              if is_offset_in_mask_3d(ii, jj, kk, [[0,0,-3],[-1,0,-3]], mask):
+                bdry_name += 'shiftxtof'
+              else:
+                bdry_name += 'shiftxtofred'
+            #elif is_3_in_a_row_3d(ii, jj+1, kk, mask, 1) and is_3_in_a_row_3d(ii+1, jj+1, kk, mask, 0):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[1,1,0],[2,1,0],[1,2,0],[0,2,0],[0,1,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[2,2,0],[0,3,0],[1,3,0]], mask):
+                bdry_name += 'shiftlefttob'
+              else:
+                bdry_name += 'shiftlefttobred'
+            #elif is_3_in_a_row_3d(ii, jj-1, kk, mask, 1) and is_3_in_a_row_3d(ii+1, jj-1, kk, mask, 0):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[1,-1,0],[2,-1,0],[1,-2,0],[0,-2,0],[0,-1,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[2,-2,0],[0,-3,0],[1,-3,0]], mask):
+                bdry_name += 'shiftlefttot'
+              else:
+                bdry_name += 'shiftlefttotred'
+            #elif is_3_in_a_row_3d(ii, jj, kk+1, mask, 2) and is_3_in_a_row_3d(ii+1, jj, kk+1, mask, 0):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[1,0,1],[2,0,1],[1,0,2],[0,0,2],[0,0,1]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[2,0,2],[0,0,3],[1,0,2]], mask):
+                bdry_name += 'shiftlefttore'
+              else:
+                bdry_name += 'shiftlefttorered'
+            #elif is_3_in_a_row_3d(ii, jj, kk-1, mask, 2) and is_3_in_a_row_3d(ii+1, jj, kk-1, mask, 0):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[1,0,-1],[2,0,-1],[1,0,-2],[0,0,-2],[0,0,-1]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[2,0,-2],[0,0,-3],[1,0,-2]], mask):
+                bdry_name += 'shiftlefttof'
+              else:
+                bdry_name += 'shiftlefttofred'
+            #elif is_3_in_a_row_3d(ii, jj+1, kk, mask, 1) and is_3_in_a_row_3d(ii-1, jj+1, kk, mask, 0):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[-1,1,0],[-2,1,0],[-1,2,0],[0,2,0],[0,1,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[-2,2,0],[0,3,0],[-1,3,0]], mask):
+                bdry_name += 'shiftrighttob'
+              else:
+                bdry_name += 'shiftrighttobred'
+            #elif is_3_in_a_row_3d(ii, jj-1, kk, mask, 1) and is_3_in_a_row_3d(ii-1, jj-1, kk, mask, 0):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[-1,-1,0],[-2,-1,0],[-1,-2,0],[0,-2,0],[0,-1,0]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[-2,-2,0],[0,-3,0],[-1,-3,0]], mask):
+                bdry_name += 'shiftrighttot'
+              else:
+                bdry_name += 'shiftrighttotred'
+            #elif is_3_in_a_row_3d(ii, jj, kk+1, mask, 2) and is_3_in_a_row_3d(ii-1, jj, kk+1, mask, 0):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[-1,0,1],[-2,0,1],[-1,0,2],[0,0,2],[0,0,1]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[-2,0,2],[0,0,3],[-1,0,3]], mask):
+                bdry_name += 'shiftrighttore'
+              else:
+                bdry_name += 'shiftrighttorered'
+            #elif is_3_in_a_row_3d(ii, jj, kk-1, mask, 2) and is_3_in_a_row_3d(ii-1, jj, kk-1, mask, 0):
+            elif is_offset_in_mask_3d(ii, jj, kk, [[-1,0,-1],[-2,0,-1],[-1,0,-2],[0,0,-2],[0,0,-1]], mask):
+              if is_offset_in_mask_3d(ii, jj, kk, [[-2,0,-2],[0,0,-3],[-1,0,-3]], mask):
+                bdry_name += 'shiftrighttof'
+              else:
+                bdry_name += 'shiftrighttofred'
             else:
               bdry_name += 'nox'
 
-            if 'no' in bdry_name or 'shift' in bdry_name:
+            #if 'no' in bdry_name or 'shift' in bdry_name:
+            if 'no' in bdry_name:
               # can't take derivatives currently
               # Note that with care there are some cases here where we still can take derivatives
               # just not as currently implemented.  For now, mask these regions
-              print("masking pixel", ii, jj, kk,"for boundary type",bdry_name)
-              mask[ii,jj,kk] = 0
+              num_no += 1
+              if modify_mask:
+                #print("masking pixel", ii, jj, kk,"for boundary type",bdry_name)
+                mask[ii,jj,kk] = 0
+              # Instead, leave points unmasked, but set boundary type to out of bounds so we don't take derivatives of these points
+              # Want to be able to use the points when calculating derivatives for other points
               bdry_type[ii,jj,kk] = 0
             else:
+              #if 'shift' in bdry_name:
+                # ignoring all shift points
+                #if modify_mask:
+                  #print("ignoring shift case, for pixel", ii, jj, kk,"for boundary type",bdry_name)
+                  #mask[ii,jj,kk] = 0
+                #bdry_type[ii,jj,kk]=0
+              if 'red' in bdry_name:
+                #print("Will compute reduced accuracy 2nd derivative for pixel", ii , jj, kk, "boundary type", bdry_name)
+                num_red += 1
+                #if modify_mask:
+                  #print("reduced 2nd deriv accuracy, for pixel", ii, jj, kk,"for boundary type",bdry_name)
+                  #mask[ii,jj,kk] = 0
+                #bdry_type[ii,jj,kk] = 0
               if bdry_name not in bdry_map:
                 bdry_map[bdry_name] = num_known_bdrys
                 num_known_bdrys += 1
@@ -565,6 +854,9 @@ def determine_boundary_3d(mask):
   #       else:
   #         bdry_type[ii,jj,kk] = 0
 
+  print("Found", num_no, "voxels where unable to take 1st derivative.")
+  print("Found", num_red, "reduced accuracy 2nd derivative voxels.")
+  #print("WARNING! IGNORING ALL SHIFT BOUNDARY CASES!")
   for ii in range(1,num_known_bdrys):
     bdry_idx[ii] = np.where(bdry_type == ii)
 

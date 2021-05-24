@@ -27,6 +27,19 @@ def writePath3D(x_coords, y_coords, z_coords, filename):
     np.save(f, y_coords)
     np.save(f, z_coords)
 
+def readPath(filename):
+  with open(filename, 'rb') as f:
+    x_coords = np.load(f)
+    y_coords = np.load(f)
+  return(x_coords, y_coords)
+
+def readPath3D(filename):
+  with open(filename, 'rb') as f:
+    x_coords = np.load(f)
+    y_coords = np.load(f)
+    z_coords = np.load(f)
+  return(x_coords, y_coords, z_coords)
+
 def loadDataFromMat(filename, elem):
   mat = loadmat(filename)
   return mat[elem]

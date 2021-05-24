@@ -6,7 +6,10 @@ from disp.vis import vis_tensors, vis_path, disp_scalar_to_file
 from disp.vis import  disp_vector_to_file, disp_tensor_to_file
 from disp.vis import disp_gradG_to_file, disp_gradA_to_file
 from lazy_imports import plt, np
+from lazy_imports import savemat
 from util.parsers import parseMetricEstStdout
+import pickle
+from data.io import WriteTensorNPArray, WriteScalarNPArray
 
 # for each parameter set
 #   run metric estimation
@@ -18,45 +21,39 @@ from util.parsers import parseMetricEstStdout
 
 #TODO better to call these experiments?
 
-def run_simulation(sim_name, input_tensor, input_mask, bin_dir, input_dir, output_root_dir, use_minimum_energy, atols, alpha_inits, sigmas, start_coords, init_velocities, rhs_file=None):
+def run_simulation(sim_name, input_tensor, input_mask, input_dir, output_root_dir, min_eigenvalues, num_iters, sigmas, start_coords, init_velocities):
   me_cfg = me.default_config()
   gs_cfg = gs.default_config()
 
-  me_cfg.paths.commandPrefix = bin_dir
   me_cfg.paths.inputPrefix = input_dir
   me_cfg.options.inputTensorSuffix = input_tensor
   me_cfg.options.inputMaskSuffix = input_mask
-  me_cfg.options.outputTensorSuffix = 'gmres_scaled_tensors.nhdr'
-  me_cfg.options.euc_init.outputTensorSuffix = 'euc_scaled_tensors.nhdr'
-  me_cfg.options.dim = 2
-  me_cfg.options.use_minimum_energy = use_minimum_energy
-  me_cfg.options.rtol = 1e-20 # make small so this isn't the reason for stopping
-
+  me_cfg.options.outputTensorSuffix = 'scaled_tensors.nhdr'
+  me_cfg.options.dim = 3
+  # don't save intermediate results when running many cases, takes too much memory
+  me_cfg.options.saveIntermediateResults = False
+  
   gs_cfg.options.inputTensorSuffix = me_cfg.options.outputTensorSuffix
-  gs_cfg.options.inputMaskFile = f'{me_cfg.paths.inputPrefix}/{me_cfg.options.inputMaskSuffix}'
   gs_cfg.options.doDataTranspose = True
-  gs_cfg.options.transpose = (2, 0, 1)
-
-  if rhs_file is not None:
-    me_cfg.options.read_rhs_from_file = True
-    me_cfg.options.rhsFilename = rhs_file
+  gs_cfg.options.transpose = (3, 0, 1, 2)
+  gs_cfg.options.both_directions = True
   
   # TODO do we want to pass these in instead?
-  geo_delta_t = 0.005
-  geo_iters = 44000 # 22000 for Kris annulus
-  euler_delta_t = 0.01
-  euler_iters = 10600
+  geo_delta_t = 0.1
+  geo_iters = 3000 
+  euler_delta_t = 0.1
+  euler_iters = 4600
 
   results = []
 
-  for init_alpha in alpha_inits:
-    for atol in atols:
+  for min_eval in min_eigenvalues:
+    for num_iter in num_iters:
       for sigma in sigmas:
-        test_case = f"alpha_init_{init_alpha}_atol_{atol}_sigma_{sigma}"
+        test_case = f"mineval_{min_eval}_n_{num_iter}_s_{sigma}"
         test_dir = f"{output_root_dir}/{test_case}/"
         me_cfg.paths.outputPrefix = test_dir
-        me_cfg.options.do_Euclidean_initialization = init_alpha
-        me_cfg.options.atol = atol
+        me_cfg.options.min_eigenvalue = min_eval
+        me_cfg.options.num_iterations = num_iter
         me_cfg.options.sigma = sigma
         
         result = {}
@@ -69,16 +66,37 @@ def run_simulation(sim_name, input_tensor, input_mask, bin_dir, input_dir, outpu
         met_est = me.MetricEstimator(me_cfg)
         try:
           print(f"Running metric estimation for {test_case}")
-          (success, res) = met_est.run()
+          (alpha, out_tens, out_mask, rks, intermed_results) = met_est.run()
         
           # saving off config, commands, time to run is good provenance tracking
           # TODO figure out how to automate/standardize this to make it easier
           #    for other sim writing later
-          result["metricEst"]["commands"] = met_est.commands
+          result["metricEst"]["alpha"] = alpha
           result["metricEst"]["time"] = met_est.get_run_time()
-          result["metricEst"]["stdout"] = res
-        except:
-          print(f"Error while running {test_case} with config {YAMLcfg.ConfigToYAML(me.metricEstimatorConfigSpec, me_cfg)}")
+          result["metricEst"]["out_tens"] = out_tens
+          result["metricEst"]["out_mask"] = out_mask
+          result["metricEst"]["rks"] = rks
+          #result["metricEst"]["intermed_results"] = intermed_results
+        
+          xsz = out_mask.shape[0]
+          ysz = out_mask.shape[1]
+          zsz = out_mask.shape[2]
+          out_tens_tri = np.zeros((xsz,ysz,zsz,6))
+          out_tens_tri[:,:,:,0] = out_tens[:,:,:,0,0]
+          out_tens_tri[:,:,:,1] = out_tens[:,:,:,0,1]
+          out_tens_tri[:,:,:,2] = out_tens[:,:,:,0,2]
+          out_tens_tri[:,:,:,3] = out_tens[:,:,:,1,1]
+          out_tens_tri[:,:,:,4] = out_tens[:,:,:,1,2]
+          out_tens_tri[:,:,:,5] = out_tens[:,:,:,2,2]
+        
+          WriteTensorNPArray(out_tens_tri, f"{test_dir}/{me_cfg.options.outputTensorSuffix}")
+          #WriteTensorNPArray(in_tens, f'{test_dir}/orig_tensors.nhdr')
+          WriteScalarNPArray(out_mask, f'{test_dir}/filt_mask.nhdr')
+          WriteScalarNPArray(alpha, f'{test_dir}/alpha.nhdr')
+          success = True
+          
+        except Exception as e:
+          print(f"Error {e} while running {test_case} with config {YAMLcfg.ConfigToYAML(me.MetricEstimatorConfigSpec, me_cfg)}")
           success = False
           
         result["metricEst"]["status"] = success
@@ -87,6 +105,7 @@ def run_simulation(sim_name, input_tensor, input_mask, bin_dir, input_dir, outpu
         #TODO parse results
         gs_cfg.paths.outputPrefix = me_cfg.paths.outputPrefix
         gs_cfg.paths.inputPrefix = me_cfg.paths.outputPrefix
+        gs_cfg.options.inputMaskFile = f'{test_dir}/filt_mask.nhdr'
         
         coord_results = []
         for coords in start_coords:
@@ -108,19 +127,19 @@ def run_simulation(sim_name, input_tensor, input_mask, bin_dir, input_dir, outpu
             shooter = gs.GeodesicShooter(gs_cfg)
             try:
               print(f"Running geodesic shooting for {test_case} and starting point {coords}")
-              points_x, points_y = shooter.run()
+              points_x, points_y, points_z = shooter.run()
               success = True
-            except:
-              print(f"Error while geodesic shooting for {test_case} with config {YAMLcfg.ConfigToYAML(gs.geodesicShootingConfigSpec, gs_cfg)}")
+            except Exception as e:
+              print(f"Error {e} while geodesic shooting for {test_case} with config {YAMLcfg.ConfigToYAML(gs.geodesicShootingConfigSpec, gs_cfg)}")
               success = False
         
             coord_res["shooting"]["status"] = success
             if success:
               coord_res["shooting"]["time"] = shooter.get_run_time()
-              #TODO is it ok to save off all these x, y coords?  Not too expensive?
+              #TODO is it ok to save off all these x, y, z coords?  Not too expensive?
               coord_res["shooting"]["x"] = points_x
               coord_res["shooting"]["y"] = points_y
-        
+              coord_res["shooting"]["z"] = points_z
           
             gs_cfg.options.outputPathSuffix = f'{sim_name}_{coords}_{init_velocity}_euler_path.npy'
             gs_cfg.options.delta_t = euler_delta_t
@@ -131,41 +150,47 @@ def run_simulation(sim_name, input_tensor, input_mask, bin_dir, input_dir, outpu
             integrator = gs.EulerIntegrator(gs_cfg)
             try:
               print(f"Running Euler integration for {test_case} and starting point {coords}")
-              points_x, points_y = integrator.run()
+              points_x, points_y, points_z = integrator.run()
               success = True
-            except:
-              print(f"Error during Euler integration for {test_case} with config {YAMLcfg.ConfigToYAML(gs.geodesicShootingConfigSpec, gs_cfg)}")
+            except Exception as e:
+              print(f"Error {e} during Euler integration for {test_case} with config {YAMLcfg.ConfigToYAML(gs.geodesicShootingConfigSpec, gs_cfg)}")
               success = False
         
             coord_res["euler"]["status"] = success
             if success:
               coord_res["euler"]["time"] = integrator.get_run_time()
         
-              #TODO is it ok to save off all these x, y coords?  Not too expensive?
+              #TODO is it ok to save off all these x, y, z coords?  Not too expensive?
               coord_res["euler"]["x"] = points_x
               coord_res["euler"]["y"] = points_y
+              coord_res["euler"]["z"] = points_z
         
             coord_results.append(coord_res)
           # end for each initial velocity
         # end for each start coordinate
         result["paths"] = coord_results
-        results.append(result)
+        with open(f'{test_dir}/results.pkl', 'wb') as f:
+          pickle.dump(result, f)
+        #savemat(f"{test_dir}results.mat", result)
+        if "up2" not in sim_name:
+          # upsampled case takes too much space so don't save off in that case
+          results.append(result)
       # end for each sigma
-    # end for each atol
-  # end for each init_alpha
+    # end for each num_iter
+  # end for each max_eval
         
   print(f"Finished metricEstSim {sim_name}")
   return(results)
 
 def summarize_results(results, sim_name, output_root_dir, subplot_nrows, subplot_ncols,
                       show_energy_plot):
+  print("Not implemented yet for new version of metric estimation, fix up before running")
+  return()
   num_test_cases = len(results)
   cases_per_fig = subplot_nrows * subplot_ncols
   new_fig = True
   tens_fig = None
   energy_fig = None
-  energy_resid_fig = None
-  resid_fig = None
   fig_count = 1
   #fig_file_root = f"{sim_name}_paths_{fig_count}.png"
   # TODO decide whether want to keep using inputTensorSuffix from first result as background

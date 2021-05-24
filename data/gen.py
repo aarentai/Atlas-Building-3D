@@ -529,6 +529,9 @@ def gen_3D_tensor_image(xsz, ysz, tmin, tmax, numt, xf, dxf, yf, dyf, fdist, num
   dx = dxf(t, numt)
   dy = dyf(t, numt)
 
+  # scale isotropic tensors outside image by this factor
+  iso_scale = 0.1
+  
   # Convert seed_t1, seed_t2 into indices into t which is length numt
   seed1 = min(int(round(seed_t1 * (numt-1))), t.shape[0])
   seed2 = min(int(round(seed_t2 * (numt-1))), t.shape[0])
@@ -586,7 +589,7 @@ def gen_3D_tensor_image(xsz, ysz, tmin, tmax, numt, xf, dxf, yf, dyf, fdist, num
 
   if do_isotropic:
     add_3D_isotropic_background(tens)
-    tens = 0.1 * tens
+    tens = iso_scale * tens
 
   # roll off the ratio by e^(a*d + b) where b = ln_ratio, a = -b / (fdist+finc)
   blurred_ratio = ratio
@@ -608,8 +611,10 @@ def gen_3D_tensor_image(xsz, ysz, tmin, tmax, numt, xf, dxf, yf, dyf, fdist, num
   radius2 = np.sqrt(rsq2)
  
   zctrval = zrg[0] + zinc * zcenter
-  zs = np.linspace(-radius, radius, zsz)
-
+  #zs = np.linspace(-radius, radius, zsz)
+  # Do this way to ensure we're symmetric in the z-direction
+  zhalf = np.linspace(-radius,0,int((zsz-1)/2),endpoint=False)
+  zs = np.concatenate((zhalf,[0]))  
   idx=0
 
   #xcurval = x[idx]
@@ -629,7 +634,9 @@ def gen_3D_tensor_image(xsz, ysz, tmin, tmax, numt, xf, dxf, yf, dyf, fdist, num
     for idx in range(len(x)):
       max_tsq = cur_rsq / (dx[idx]**2 + dy[idx]**2)
       max_t = np.sqrt(max_tsq)
-      tspc = np.linspace(-max_t, max_t, 100)
+      #tspc = np.linspace(-max_t, max_t, 100)
+      thalf = np.linspace(-max_t,0,75,endpoint=False)
+      tspc = np.concatenate((thalf,[0],-thalf[::-1]))
       for tt in tspc:
         pts, pcts = get_3D_antialiased_points((x[idx] + tt*dy[idx] - xrg[0]) / xinc, (y[idx] - tt*dx[idx] - yrg[0]) / yinc, (zz - zrg[0]) / zinc)
         for pt, pct in zip(pts,pcts):
@@ -637,21 +644,25 @@ def gen_3D_tensor_image(xsz, ysz, tmin, tmax, numt, xf, dxf, yf, dyf, fdist, num
           ybin = pt[1]
           zbin = pt[2]
             
+          ozbin = zcenter + (zcenter - zbin)
+            
           dxim[xbin,ybin,zbin] += pct * dxdys[0,idx]
           dyim[xbin,ybin,zbin] += pct * dxdys[1,idx]
           pixsum[xbin,ybin,zbin] += pct
           cnts[xbin,ybin,zbin] += 1
+          if ozbin != zbin:
+            dxim[xbin,ybin,ozbin] += pct * dxdys[0,idx]
+            dyim[xbin,ybin,ozbin] += pct * dxdys[1,idx]
+            pixsum[xbin,ybin,ozbin] += pct
+            cnts[xbin,ybin,ozbin] += 1
 
-
-  
-  add_to_3D_image(img, xys, pixsum, cnts, round_to_1=True)
+  add_to_3D_image(img, xys, pixsum, cnts, round_to_1=False)
   add_to_3D_tensor_image(tens, xys, dxim, dyim, pixsum, cnts, ratio, template_tensor) # need to figure out blurring in this new context
   add_to_3D_seed_image(seed, x, y, zs, dx, dy, rsq, xrg, yrg, zrg, seed1, seed2)
-        
 
   if zero_padding_width:
     if do_isotropic:
-      zero = np.ones((6))
+      zero = iso_scale * np.ones((6))
       zero[1] = 0
       zero[2] = 0
       zero[4] = 0

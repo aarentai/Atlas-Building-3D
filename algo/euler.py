@@ -1,6 +1,7 @@
 from lazy_imports import np
 import math
-from util.tensors import tens_interp, tens_interp_3d, eigen_vec, eigen_vec_3d, direction_3d
+from util.tensors import tens_interp, tens_interp_3d, eigen_vec, eigen_vec_3d
+from util.tensors import direction, direction_3d
 from data import io
 
 
@@ -135,8 +136,8 @@ def eulerpath(tensor_field, mask_image, start_coordinate, initial_velocity=None,
     (u, v, prev_angle) = get_eigenvec_at_point(x, y, tensor_field, prev_angle)
 
   if both_directions:
-    points_x = points_x + back_x
-    points_y = points_y + back_y
+    points_x = points_x[::-1] + back_x
+    points_y = points_y[::-1] + back_y
     
   if filename:
     io.writePath(points_x, points_y, filename)
@@ -297,9 +298,9 @@ def eulerpath_3d(tensor_field, mask_image, start_coordinate, initial_velocity=No
     (u, v, w, prev_angle) = get_eigenvec_at_point_3d(x, y, z, tensor_field, prev_angle)
 
   if both_directions:
-    points_x = points_x + back_x
-    points_y = points_y + back_y
-    points_z = points_z + back_z
+    points_x = points_x[::-1] + back_x
+    points_y = points_y[::-1] + back_y
+    points_z = points_z[::-1] + back_z
     
   if filename:
     io.writePath3D(points_x, points_y, points_z, filename)

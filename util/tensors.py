@@ -397,45 +397,44 @@ def eigv_up(tens):
     return (vs)
 
 def eigv_3d(tens):
-    # TODO check dimensions, for now assuming 3D
-    # The hope is that this implementation fixes the sign issue
-#     phi = 0.5 * np.arctan2(2 * tens[:,:,:,0,1] , (tens[:,:,:,0,0] - tens[:,:,:,1,1]))
-#     vs = np.zeros_like(tens)
-#     # want vs [:,:,0] to contain the eigenvector corresponding to the smallest
-#     # eigenvalue, which is \lambda_2 from the link above ie [-sin(\phi) cos(\phi)]
-#     vs[:,:,:,1,0] = np.cos(phi)
-#     vs[:,:,:,1,1] = np.sin(phi)
-#     vs[:,:,:,0,1] = vs[:,:,:,1,0] # cos(phi)
-#     vs[:,:,:,0,0] = -vs[:,:,:,1,1] # -sin(phi)
-  # instead of using Kronenburg method, we will call numpy's linalg.eigh
-  # and simply correct the sign for the case where we get a positive eigenvector [1 0 0]
-  # in between two eigenvectors [-0.99967193 -0.02561302 -0] and [-0.99967193  0.02561302  0]
-  # in this case, we really want the positive eigenvector to be [-1 -0 -0]
+  # Find principal eigenvectors of 3d tensor field.
   eigenvals, eigenvecs = np.linalg.eigh(tens)
+  return (eigenvecs)
+
+def eigv_sign_deambig(eigenvecs):
+  # deambiguate eigenvector sign in each direction independently
   # want center pixel eigenvector to have same sign as both neighbors, when both neighbors sign matches
   # lr_dot, bt_dot, rf_dot > 0 ==> neighbors sign matches
   # lp_dot, bp_dot, rp_dot < 0 ==> pixel sign does not match neighbor
-  lp_dot = np.einsum('...j,...j',eigenvecs[:-1,:,:,:,2],eigenvecs[1:,:,:,:,2])
-  lr_dot = np.einsum('...j,...j',eigenvecs[:-2,:,:,:,2],eigenvecs[2:,:,:,:,2])
-  bp_dot = np.einsum('...j,...j',eigenvecs[:,:-1,:,:,2],eigenvecs[:,1:,:,:,2])
-  bt_dot = np.einsum('...j,...j',eigenvecs[:,:-2,:,:,2],eigenvecs[:,2:,:,:,2])
-  rp_dot = np.einsum('...j,...j',eigenvecs[:,:,:-1,:,2],eigenvecs[:,:,1:,:,2])
-  rf_dot = np.einsum('...j,...j',eigenvecs[:,:,:-2,:,2],eigenvecs[:,:,2:,:,2])
-  for xx in range(tens.shape[0]):
-    for yy in range(tens.shape[1]):
-      for zz in range(tens.shape[2]):
+  vecsx = np.copy(eigenvecs)
+  vecsy = np.copy(eigenvecs)
+  vecsz = np.copy(eigenvecs)
+  #lp_dot = np.einsum('...j,...j',eigenvecs[:-1,:,:,:,2],eigenvecs[1:,:,:,:,2])
+  #lr_dot = np.einsum('...j,...j',eigenvecs[:-2,:,:,:,2],eigenvecs[2:,:,:,:,2])
+  #bp_dot = np.einsum('...j,...j',eigenvecs[:,:-1,:,:,2],eigenvecs[:,1:,:,:,2])
+  #bt_dot = np.einsum('...j,...j',eigenvecs[:,:-2,:,:,2],eigenvecs[:,2:,:,:,2])
+  #rp_dot = np.einsum('...j,...j',eigenvecs[:,:,:-1,:,2],eigenvecs[:,:,1:,:,2])
+  #rf_dot = np.einsum('...j,...j',eigenvecs[:,:,:-2,:,2],eigenvecs[:,:,2:,:,2])
+  lp_dot = np.einsum('...j,...j',eigenvecs[:-1,:,:,:],eigenvecs[1:,:,:,:])
+  lr_dot = np.einsum('...j,...j',eigenvecs[:-2,:,:,:],eigenvecs[2:,:,:,:])
+  bp_dot = np.einsum('...j,...j',eigenvecs[:,:-1,:,:],eigenvecs[:,1:,:,:])
+  bt_dot = np.einsum('...j,...j',eigenvecs[:,:-2,:,:],eigenvecs[:,2:,:,:])
+  rp_dot = np.einsum('...j,...j',eigenvecs[:,:,:-1,:],eigenvecs[:,:,1:,:])
+  rf_dot = np.einsum('...j,...j',eigenvecs[:,:,:-2,:],eigenvecs[:,:,2:,:])
+  for xx in range(eigenvecs.shape[0]):
+    for yy in range(eigenvecs.shape[1]):
+      for zz in range(eigenvecs.shape[2]):
         if xx < lr_dot.shape[0]:
           if lr_dot[xx,yy,zz] > 0 and lp_dot[xx,yy,zz] < 0:
-            eigenvecs[xx+1,yy,zz,:,2] = -eigenvecs[xx+1,yy,zz,:,2]
+            vecsx[xx+1,yy,zz,:] = -vecsx[xx+1,yy,zz,:]
         if yy < bt_dot.shape[1]:
           if bt_dot[xx,yy,zz] > 0 and bp_dot[xx,yy,zz] < 0:
-            print('y direction need to correct:',xx,yy,zz)
-            #eigenvecs[xx,yy+1,zz,:,2] = -eigenvecs[xx,yy+1,zz,:,2]
+            vecsy[xx,yy+1,zz,:] = -vecsy[xx,yy+1,zz,:]
         if zz < rf_dot.shape[2]:
           if rf_dot[xx,yy,zz] > 0 and rp_dot[xx,yy,zz] < 0:
-            print('z direction need to correct:',xx,yy,zz)
-            #eigenvecs[xx,yy,zz+1,:,2] = -eigenvecs[xx,yy,zz+1,:,2]
-  return (eigenvecs)
+            vecsz[xx,yy,zz+1,:] = -vecsz[xx,yy,zz+1,:]
+            
+  return (vecsx, vecsy, vecsz)
 
 # def eigv_up_3d(tens):
 #     # Compute eigenvectors for 3D tensors stored in upper triangular format
@@ -451,7 +450,26 @@ def eigv_3d(tens):
 #     vs[:,:,:,0,1] = vs[:,:,:,1,0] # cos(phi)
 #     vs[:,:,:,0,0] = -vs[:,:,:,1,1] # -sin(phi)
 #     return (vs)
-  
+
+def make_pos_def(tens, mask, small_eval = 0.00005):
+  # make any small or negative eigenvalues slightly positive and then reconstruct tensors
+  evals, evecs = np.linalg.eig(tens)
+  #np.abs(evals, out=evals)
+  idx = np.where(evals < small_eval)
+  #idx = np.where(evals < 0)
+  num_found = 0
+  #print(len(idx[0]), 'tensors found with eigenvalues <', small_eval)
+  for ee in range(len(idx[0])):
+    if mask[idx[0][ee], idx[1][ee], idx[2][ee]]:
+      num_found += 1
+      evals[idx[0][ee], idx[1][ee], idx[2][ee], idx[3][ee]] = small_eval
+
+  print(num_found, 'tensors found with eigenvalues <', small_eval)
+  #print(num_found, 'tensors found with eigenvalues < 0')
+  mod_tens = np.einsum('...ij,...jk,...k,...lk->...il',
+                       evecs, np.identity(3), evals, evecs)
+  return(mod_tens)
+    
  
 def scale_by_alpha(tensors, alpha):
   # This scaling function assumes that the input provided for scaling are diffusion tensors

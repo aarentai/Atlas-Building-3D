@@ -14,13 +14,13 @@ def select_diffs_3d(btype,zero_shifts=True):
       if zero_shifts:
         xdiff = diff_0
       else:
-        if "bottom" in btype:
+        if "shiftxtob" in btype:
           xdiff = gradx_shiftbottom_idx_3d
-        elif "top" in btype:
+        elif "shiftxtot" in btype:
           xdiff = gradx_shifttop_idx_3d
-        elif "rear" in btype:
+        elif "shiftxtore" in btype:
           xdiff = gradx_shiftrear_idx_3d
-        elif "front" in btype:
+        elif "shiftxtof" in btype:
           xdiff = gradx_shiftfront_idx_3d
         else:
           xdiff = diff_0
@@ -28,13 +28,13 @@ def select_diffs_3d(btype,zero_shifts=True):
       if zero_shifts:
         xdiff = diff_0
       else:
-        if "bottom" in btype:
+        if "shiftlefttob" in btype:
           xdiff = left_shiftbottom_idx_3d
-        elif "top" in btype:
+        elif "shiftlefttot" in btype:
           xdiff = left_shifttop_idx_3d
-        elif "rear" in btype:
+        elif "shiftlefttore" in btype:
           xdiff = left_shiftrear_idx_3d
-        elif "front" in btype:
+        elif "shiftlefttof" in btype:
           xdiff = left_shiftfront_idx_3d
         else:
           xdiff = diff_0
@@ -42,13 +42,13 @@ def select_diffs_3d(btype,zero_shifts=True):
       if zero_shifts:
         xdiff = diff_0
       else:
-        if "bottom" in btype:
+        if "shiftrighttob" in btype:
           xdiff = right_shiftbottom_idx_3d
-        elif "top" in btype:
+        elif "shiftrighttot" in btype:
           xdiff = right_shifttop_idx_3d
-        elif "rear" in btype:
+        elif "shiftrighttore" in btype:
           xdiff = right_shiftrear_idx_3d
-        elif "front" in btype:
+        elif "shiftrighttof" in btype:
           xdiff = right_shiftfront_idx_3d
         else:
           xdiff = diff_0
@@ -62,13 +62,13 @@ def select_diffs_3d(btype,zero_shifts=True):
       if zero_shifts:
         ydiff = diff_0
       else:
-        if "left" in btype:
+        if "shiftytol" in btype:
           ydiff = grady_shiftleft_idx_3d
-        elif "right" in btype:
+        elif "shiftytori" in btype:
           ydiff = grady_shiftright_idx_3d
-        elif "rear" in btype:
+        elif "shiftytore" in btype:
           ydiff = grady_shiftrear_idx_3d
-        elif "front" in btype:
+        elif "shiftytof" in btype:
           ydiff = grady_shiftfront_idx_3d
         else:
           ydiff = diff_0
@@ -76,13 +76,13 @@ def select_diffs_3d(btype,zero_shifts=True):
       if zero_shifts:
         ydiff = diff_0
       else:
-        if "left" in btype:
+        if "shiftbottomtol" in btype:
           ydiff = bottom_shiftleft_idx_3d
-        elif "right" in btype:
+        elif "shiftbottomtori" in btype:
           ydiff = bottom_shiftright_idx_3d
-        elif "rear" in btype:
+        elif "shiftbottomtore" in btype:
           ydiff = bottom_shiftrear_idx_3d
-        elif "front" in btype:
+        elif "shiftbottomtof" in btype:
           ydiff = bottom_shiftfront_idx_3d
         else:
           ydiff = diff_0
@@ -90,13 +90,13 @@ def select_diffs_3d(btype,zero_shifts=True):
       if zero_shifts:
         ydiff = diff_0
       else:
-        if "left" in btype:
+        if "shifttoptol" in btype:
           ydiff = top_shiftleft_idx_3d
-        elif "right" in btype:
+        elif "shifttoptori" in btype:
           ydiff = top_shiftright_idx_3d
-        elif "rear" in btype:
+        elif "shifttoptore" in btype:
           ydiff = top_shiftrear_idx_3d
-        elif "front" in btype:
+        elif "shifttoptof" in btype:
           ydiff = top_shiftfront_idx_3d
         else:
           ydiff = diff_0
@@ -110,13 +110,13 @@ def select_diffs_3d(btype,zero_shifts=True):
       if zero_shifts:
         zdiff = diff_0
       else:
-        if "left" in btype:
+        if "shiftztol" in btype:
           zdiff = gradz_shiftleft_idx_3d
-        elif "right" in btype:
+        elif "shiftztori" in btype:
           zdiff = gradz_shiftright_idx_3d
-        elif "bottom" in btype:
+        elif "shiftztob" in btype:
           zdiff = gradz_shiftbottom_idx_3d
-        elif "top" in btype:
+        elif "shiftztot" in btype:
           zdiff = gradz_shifttop_idx_3d
         else:
           zdiff = diff_0
@@ -124,13 +124,13 @@ def select_diffs_3d(btype,zero_shifts=True):
       if zero_shifts:
         zdiff = diff_0
       else:
-        if "left" in btype:
+        if "shiftreartol" in btype:
           zdiff = rear_shiftleft_idx_3d
-        elif "right" in btype:
+        elif "shiftreartori" in btype:
           zdiff = rear_shiftright_idx_3d
-        elif "bottom" in btype:
+        elif "shiftreartob" in btype:
           zdiff = rear_shiftbottom_idx_3d
-        elif "top" in btype:
+        elif "shiftreartot" in btype:
           zdiff = rear_shifttop_idx_3d
         else:
           zdiff = diff_0
@@ -138,13 +138,13 @@ def select_diffs_3d(btype,zero_shifts=True):
       if zero_shifts:
         zdiff = diff_0
       else:
-        if "left" in btype:
+        if "shiftfronttol" in btype:
           zdiff = front_shiftleft_idx_3d
-        elif "right" in btype:
+        elif "shiftfronttori" in btype:
           zdiff = front_shiftright_idx_3d
-        elif "bottom" in btype:
+        elif "shiftfronttob" in btype:
           zdiff = front_shiftbottom_idx_3d
-        elif "top" in btype:
+        elif "shiftfronttot" in btype:
           zdiff = front_shifttop_idx_3d
         else:
           zdiff = diff_0
@@ -166,35 +166,35 @@ def select_eigv_diffs_3d(btype):
 
   else:
     if "shiftx" in btype:
-      if "bottom" in btype:
+      if "shiftxtob" in btype:
         xdiff = eigv_gradx_shiftbottom_idx_3d
-      elif "top" in btype:
+      elif "shiftxtot" in btype:
         xdiff = eigv_gradx_shifttop_idx_3d
-      elif "rear" in btype:
+      elif "shiftxtore" in btype:
         xdiff = eigv_gradx_shiftrear_idx_3d
-      elif "front" in btype:
+      elif "shiftxtof" in btype:
         xdiff = eigv_gradx_shiftfront_idx_3d
       else:
         xdiff = eigv_diff_0
     elif "shiftleft" in btype:
-      if "bottom" in btype:
+      if "shiftlefttob" in btype:
         xdiff = eigv_left_shiftbottom_idx_3d
-      elif "top" in btype:
+      elif "shiftlefttot" in btype:
         xdiff = eigv_left_shifttop_idx_3d
-      elif "rear" in btype:
+      elif "shiftlefttore" in btype:
         xdiff = eigv_left_shiftrear_idx_3d
-      elif "front" in btype:
+      elif "shiftlefttof" in btype:
         xdiff = eigv_left_shiftfront_idx_3d
       else:
         xdiff = eigv_diff_0
     elif "shiftright" in btype:
-      if "bottom" in btype:
+      if "shiftrighttob" in btype:
         xdiff = eigv_right_shiftbottom_idx_3d
-      elif "top" in btype:
+      elif "shiftrighttot" in btype:
         xdiff = eigv_right_shifttop_idx_3d
-      elif "rear" in btype:
+      elif "shiftrighttore" in btype:
         xdiff = eigv_right_shiftrear_idx_3d
-      elif "front" in btype:
+      elif "shiftrighttof" in btype:
         xdiff = eigv_right_shiftfront_idx_3d
       else:
         xdiff = eigv_diff_0
@@ -205,35 +205,35 @@ def select_eigv_diffs_3d(btype):
     else:
       xdiff = eigv_gradx_idx_3d
     if "shifty" in btype:
-      if "left" in btype:
+      if "shiftytol" in btype:
         ydiff = eigv_grady_shiftleft_idx_3d
-      elif "right" in btype:
+      elif "shiftytori" in btype:
         ydiff = eigv_grady_shiftright_idx_3d
-      elif "rear" in btype:
+      elif "shiftytore" in btype:
         ydiff = eigv_grady_shiftrear_idx_3d
-      elif "front" in btype:
+      elif "shiftytof" in btype:
         ydiff = eigv_grady_shiftfront_idx_3d
       else:
         ydiff = eigv_diff_0
     elif "shiftbottom" in btype:
-      if "left" in btype:
+      if "shiftbottomtol" in btype:
         ydiff = eigv_bottom_shiftleft_idx_3d
-      elif "right" in btype:
+      elif "shiftbottomtori" in btype:
         ydiff = eigv_bottom_shiftright_idx_3d
-      elif "rear" in btype:
+      elif "shiftbottomtore" in btype:
         ydiff = eigv_bottom_shiftrear_idx_3d
-      elif "front" in btype:
+      elif "shiftbottomtof" in btype:
         ydiff = eigv_bottom_shiftfront_idx_3d
       else:
         ydiff = eigv_diff_0
     elif "shifttop" in btype:
-      if "left" in btype:
+      if "shifttoptol" in btype:
         ydiff = eigv_top_shiftleft_idx_3d
-      elif "right" in btype:
+      elif "shifttoptori" in btype:
         ydiff = eigv_top_shiftright_idx_3d
-      elif "rear" in btype:
+      elif "shifttoptore" in btype:
         ydiff = eigv_top_shiftrear_idx_3d
-      elif "front" in btype:
+      elif "shifttoptof" in btype:
         ydiff = eigv_top_shiftfront_idx_3d
       else:
         ydiff = eigv_diff_0
@@ -244,35 +244,35 @@ def select_eigv_diffs_3d(btype):
     else:
       ydiff = eigv_grady_idx_3d
     if "shiftz" in btype:
-      if "left" in btype:
+      if "shiftztol" in btype:
         zdiff = eigv_gradz_shiftleft_idx_3d
-      elif "right" in btype:
+      elif "shiftztori" in btype:
         zdiff = eigv_gradz_shiftright_idx_3d
-      elif "bottom" in btype:
+      elif "shiftztob" in btype:
         zdiff = eigv_gradz_shiftbottom_idx_3d
-      elif "top" in btype:
+      elif "shiftztot" in btype:
         zdiff = eigv_gradz_shifttop_idx_3d
       else:
         zdiff = eigv_diff_0
     elif "shiftrear" in btype:
-      if "left" in btype:
+      if "shiftreartol" in btype:
         zdiff = eigv_rear_shiftleft_idx_3d
-      elif "right" in btype:
+      elif "shiftreartori" in btype:
         zdiff = eigv_rear_shiftright_idx_3d
-      elif "bottom" in btype:
+      elif "shiftreartob" in btype:
         zdiff = eigv_rear_shiftbottom_idx_3d
-      elif "top" in btype:
+      elif "shiftreartot" in btype:
         zdiff = eigv_rear_shifttop_idx_3d
       else:
         zdiff = eigv_diff_0
     elif "shiftfront" in btype:
-      if "left" in btype:
+      if "shiftfronttol" in btype:
         zdiff = eigv_front_shiftleft_idx_3d
-      elif "right" in btype:
+      elif "shiftfronttori" in btype:
         zdiff = eigv_front_shiftright_idx_3d
-      elif "bottom" in btype:
+      elif "shiftfronttob" in btype:
         zdiff = eigv_front_shiftbottom_idx_3d
-      elif "top" in btype:
+      elif "shiftfronttot" in btype:
         zdiff = eigv_front_shifttop_idx_3d
       else:
         zdiff = eigv_diff_0
@@ -875,6 +875,222 @@ def gradzz_idx_3d(a, idx):
   grad_zz = (a[idx[0], idx[1], idx[2]+1] - 2 * a[idx[0], idx[1], idx[2]] + a[idx[0], idx[1], idx[2]-1])
   return(grad_zz)
 
+def gradxy_bottomrightdiag_idx_3d(a, idx):
+  # Compute cross second derivative gradxgrady
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xy = (-0.5 * a[idx[0]-1, idx[1]+1, idx[2]] - 0.5 * a[idx[0]+1, idx[1]-1, idx[2]] + 0.5*a[idx[0], idx[1]-1, idx[2]]
+            + 0.5 * a[idx[0]+1, idx[1], idx[2]] + 0.5 * a[idx[0]-1, idx[1], idx[2]] + 0.5*a[idx[0], idx[1]+1, idx[2]]
+            - a[idx[0], idx[1], idx[2]] )
+  return(grad_xy)
+
+def gradxy_bottomleftdiag_idx_3d(a, idx):
+  # Compute cross second derivative gradxgrady
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xy = (0.5 * a[idx[0]+1, idx[1]+1, idx[2]] + 0.5 * a[idx[0]-1, idx[1]-1, idx[2]] - 0.5*a[idx[0], idx[1]-1, idx[2]]
+            - 0.5 * a[idx[0]+1, idx[1], idx[2]] - 0.5 * a[idx[0]-1, idx[1], idx[2]] - 0.5*a[idx[0], idx[1]+1, idx[2]]
+            + a[idx[0], idx[1], idx[2]] )
+  return(grad_xy)
+
+def gradxy_bottomleft_idx_3d(a, idx):
+  # Compute cross second derivative gradxgrady
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xy = (a[idx[0]+1, idx[1]+1, idx[2]] - a[idx[0]+1, idx[1], idx[2]]
+            - a[idx[0], idx[1]+1, idx[2]] + a[idx[0], idx[1], idx[2]])
+  return(grad_xy)
+
+def gradxy_bottomright_idx_3d(a, idx):
+  # Compute cross second derivative gradxgrady
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xy = (-a[idx[0]-1, idx[1]+1, idx[2]] + a[idx[0]-1, idx[1], idx[2]]
+            + a[idx[0], idx[1]+1, idx[2]] - a[idx[0], idx[1], idx[2]])
+  return(grad_xy)
+
+def gradxy_topleft_idx_3d(a, idx):
+  # Compute cross second derivative gradxgrady
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xy = (-a[idx[0]+1, idx[1]-1, idx[2]] + a[idx[0]+1, idx[1], idx[2]]
+            + a[idx[0], idx[1]-1, idx[2]] - a[idx[0], idx[1], idx[2]])
+  return(grad_xy)
+
+def gradxy_topright_idx_3d(a, idx):
+  # Compute cross second derivative gradxgrady
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xy = (a[idx[0]-1, idx[1]-1, idx[2]] - a[idx[0]-1, idx[1], idx[2]]
+            - a[idx[0], idx[1]-1, idx[2]] + a[idx[0], idx[1], idx[2]])
+  return(grad_xy)
+
+def gradxy_left_idx_3d(a, idx):
+  # Compute cross second derivative gradxgrady
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xy = (0.5 * a[idx[0]+1, idx[1]+1, idx[2]] - 0.5 * a[idx[0]+1, idx[1]-1, idx[2]]
+            + 0.5*a[idx[0], idx[1]-1, idx[2]] - 0.5*a[idx[0], idx[1]+1, idx[2]])
+  return(grad_xy)
+
+def gradxy_bottom_idx_3d(a, idx):
+  # Compute cross second derivative gradxgrady
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xy = (0.5 * a[idx[0]+1, idx[1]+1, idx[2]] - 0.5 * a[idx[0]-1, idx[1]+1, idx[2]]
+            + 0.5*a[idx[0]-1, idx[1], idx[2]] - 0.5*a[idx[0]+1, idx[1], idx[2]])
+  return(grad_xy)
+
+def gradxy_right_idx_3d(a, idx):
+  # Compute cross second derivative gradxgrady
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xy = (0.5 * a[idx[0]-1, idx[1]-1, idx[2]] - 0.5 * a[idx[0]-1, idx[1]+1, idx[2]]
+            - 0.5*a[idx[0], idx[1]-1, idx[2]] + 0.5*a[idx[0], idx[1]+1, idx[2]])
+  return(grad_xy)
+
+def gradxy_top_idx_3d(a, idx):
+  # Compute cross second derivative gradxgrady
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xy = (0.5 * a[idx[0]-1, idx[1]-1, idx[2]] - 0.5 * a[idx[0]+1, idx[1]-1, idx[2]]
+            - 0.5*a[idx[0]-1, idx[1], idx[2]] + 0.5*a[idx[0]+1, idx[1], idx[2]])
+  return(grad_xy)
+
+def gradxz_rearrightdiag_idx_3d(a, idx):
+  # Compute cross second derivative gradxgradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xz = (-0.5 * a[idx[0]-1, idx[1], idx[2]+1] - 0.5 * a[idx[0]+1, idx[1], idx[2]-1] + 0.5*a[idx[0], idx[1], idx[2]-1]
+            + 0.5 * a[idx[0]+1, idx[1], idx[2]] + 0.5 * a[idx[0]-1, idx[1], idx[2]] + 0.5*a[idx[0], idx[1], idx[2]+1]
+            - a[idx[0], idx[1], idx[2]] )
+  return(grad_xz)
+
+def gradxz_rearleftdiag_idx_3d(a, idx):
+  # Compute cross second derivative gradxgradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xz = (0.5 * a[idx[0]+1, idx[1], idx[2]+1] + 0.5 * a[idx[0]-1, idx[1], idx[2]-1] - 0.5*a[idx[0], idx[1], idx[2]-1]
+            - 0.5 * a[idx[0]+1, idx[1], idx[2]] - 0.5 * a[idx[0]-1, idx[1], idx[2]] - 0.5*a[idx[0], idx[1], idx[2]+1]
+            + a[idx[0], idx[1], idx[2]] )
+  return(grad_xz)
+
+def gradxz_rearleft_idx_3d(a, idx):
+  # Compute cross second derivative gradxgradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xz = (a[idx[0]+1, idx[1], idx[2]+1] - a[idx[0]+1, idx[1], idx[2]]
+            - a[idx[0], idx[1], idx[2]+1] + a[idx[0], idx[1], idx[2]])
+  return(grad_xz)
+
+def gradxz_rearright_idx_3d(a, idx):
+  # Compute cross second derivative gradxgradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xz = (-a[idx[0]-1, idx[1], idx[2]+1] + a[idx[0]-1, idx[1], idx[2]]
+            + a[idx[0], idx[1], idx[2]+1] - a[idx[0], idx[1], idx[2]])
+  return(grad_xz)
+
+def gradxz_frontleft_idx_3d(a, idx):
+  # Compute cross second derivative gradxgradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xz = (-a[idx[0]+1, idx[1], idx[2]-1] + a[idx[0]+1, idx[1], idx[2]]
+            + a[idx[0], idx[1], idx[2]-1] - a[idx[0], idx[1], idx[2]])
+  return(grad_xz)
+
+def gradxz_frontright_idx_3d(a, idx):
+  # Compute cross second derivative gradxgradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xz = (a[idx[0]-1, idx[1], idx[2]-1] - a[idx[0]-1, idx[1], idx[2]]
+            - a[idx[0], idx[1], idx[2]-1] + a[idx[0], idx[1], idx[2]])
+  return(grad_xz)
+
+def gradxz_left_idx_3d(a, idx):
+  # Compute cross second derivative gradxgradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xz = (0.5 * a[idx[0]+1, idx[1], idx[2]+1] - 0.5 * a[idx[0]+1, idx[1], idx[2]-1]
+            + 0.5*a[idx[0], idx[1], idx[2]-1] - 0.5*a[idx[0], idx[1], idx[2]+1])
+  return(grad_xz)
+
+def gradxz_rear_idx_3d(a, idx):
+  # Compute cross second derivative gradxgradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xz = (0.5 * a[idx[0]+1, idx[1], idx[2]+1] - 0.5 * a[idx[0]-1, idx[1], idx[2]+1]
+            + 0.5*a[idx[0]-1, idx[1], idx[2]] - 0.5*a[idx[0]+1, idx[1], idx[2]])
+  return(grad_xz)
+
+def gradxz_right_idx_3d(a, idx):
+  # Compute cross second derivative gradxgradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xz = (0.5 * a[idx[0]-1, idx[1], idx[2]-1] - 0.5 * a[idx[0]-1, idx[1], idx[2]+1]
+            - 0.5*a[idx[0], idx[1], idx[2]-1] + 0.5*a[idx[0], idx[1], idx[2]+1])
+  return(grad_xz)
+
+def gradxz_front_idx_3d(a, idx):
+  # Compute cross second derivative gradxgradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_xz = (0.5 * a[idx[0]-1, idx[1], idx[2]-1] - 0.5 * a[idx[0]+1, idx[1], idx[2]-1]
+            - 0.5*a[idx[0]-1, idx[1], idx[2]] + 0.5*a[idx[0]+1, idx[1], idx[2]])
+  return(grad_xz)
+
+def gradyz_reartopdiag_idx_3d(a, idx):
+  # Compute cross second derivative gradygradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_yz = (-0.5 * a[idx[0], idx[1]-1, idx[2]+1] - 0.5 * a[idx[0], idx[1]+1, idx[2]-1] + 0.5*a[idx[0], idx[1], idx[2]-1]
+            + 0.5 * a[idx[0], idx[1]+1, idx[2]] + 0.5 * a[idx[0], idx[1]-1, idx[2]] + 0.5*a[idx[0], idx[1], idx[2]+1]
+            - a[idx[0], idx[1], idx[2]] )
+  return(grad_yz)
+
+def gradyz_rearbottomdiag_idx_3d(a, idx):
+  # Compute cross second derivative gradygradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_yz = (0.5 * a[idx[0], idx[1]+1, idx[2]+1] + 0.5 * a[idx[0], idx[1]-1, idx[2]-1] - 0.5*a[idx[0], idx[1], idx[2]-1]
+            - 0.5 * a[idx[0], idx[1]+1, idx[2]] - 0.5 * a[idx[0], idx[1]-1, idx[2]] - 0.5*a[idx[0], idx[1], idx[2]+1]
+            + a[idx[0], idx[1], idx[2]] )
+  return(grad_yz)
+
+def gradyz_rearbottom_idx_3d(a, idx):
+  # Compute cross second derivative gradygradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_yz = (a[idx[0], idx[1]+1, idx[2]+1] - a[idx[0], idx[1]+1, idx[2]]
+            - a[idx[0], idx[1], idx[2]+1] + a[idx[0], idx[1], idx[2]])
+  return(grad_yz)
+
+def gradyz_reartop_idx_3d(a, idx):
+  # Compute cross second derivative gradygradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_yz = (-a[idx[0], idx[1]-1, idx[2]+1] + a[idx[0], idx[1]-1, idx[2]]
+            + a[idx[0], idx[1], idx[2]+1] - a[idx[0], idx[1], idx[2]])
+  return(grad_yz)
+
+def gradyz_frontbottom_idx_3d(a, idx):
+  # Compute cross second derivative gradygradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_yz = (-a[idx[0], idx[1]+1, idx[2]-1] + a[idx[0], idx[1]+1, idx[2]]
+            + a[idx[0], idx[1], idx[2]-1] - a[idx[0], idx[1], idx[2]])
+  return(grad_yz)
+
+def gradyz_fronttop_idx_3d(a, idx):
+  # Compute cross second derivative gradygradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_yz = (a[idx[0], idx[1]-1, idx[2]-1] - a[idx[0], idx[1]-1, idx[2]]
+            - a[idx[0], idx[1], idx[2]-1] + a[idx[0], idx[1], idx[2]])
+  return(grad_yz)
+
+def gradyz_bottom_idx_3d(a, idx):
+  # Compute cross second derivative gradygradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_yz = (0.5 * a[idx[0], idx[1]+1, idx[2]+1] - 0.5 * a[idx[0], idx[1]+1, idx[2]-1]
+            + 0.5*a[idx[0], idx[1], idx[2]-1] - 0.5*a[idx[0], idx[1], idx[2]+1])
+  return(grad_yz)
+
+def gradyz_rear_idx_3d(a, idx):
+  # Compute cross second derivative gradygradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_yz = (0.5 * a[idx[0], idx[1]+1, idx[2]+1] - 0.5 * a[idx[0], idx[1]-1, idx[2]+1]
+            + 0.5*a[idx[0], idx[1]-1, idx[2]] - 0.5*a[idx[0], idx[1]+1, idx[2]])
+  return(grad_yz)
+
+def gradyz_top_idx_3d(a, idx):
+  # Compute cross second derivative gradygradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_yz = (0.5 * a[idx[0], idx[1]-1, idx[2]-1] - 0.5 * a[idx[0], idx[1]-1, idx[2]+1]
+            - 0.5*a[idx[0], idx[1], idx[2]-1] + 0.5*a[idx[0], idx[1], idx[2]+1])
+  return(grad_yz)
+
+def gradyz_front_idx_3d(a, idx):
+  # Compute cross second derivative gradygradz
+  # WARNING! no bounds checking here, ensure that idx is at least 1 away from each edge of array in y direction
+  grad_yz = (0.5 * a[idx[0], idx[1]-1, idx[2]-1] - 0.5 * a[idx[0], idx[1]+1, idx[2]-1]
+            - 0.5*a[idx[0], idx[1]-1, idx[2]] + 0.5*a[idx[0], idx[1]+1, idx[2]])
+  return(grad_yz)
+
 def gradx_shiftbottom_idx_3d(a, idx):
   # compute gradient in x direction using a shifted y coord ala np.gradient for indices returned by np.where() calls
   # example: gradx_idx_3d(a, np.where(a < 10))
@@ -1282,16 +1498,19 @@ def front_diff_idx_3d(a, idx):
 # Using appropriate left,right,top,bottom,front,rear diffs #
 # at the boundary                                          #
 ############################################################
-def gradient_mask_3d(img, mask):
+def gradient_mask_3d(img, mask, modify_mask=True):
   # Find the gradient of img inside the mask regions
   # Assumes it's a scalar 3D image
   # Returns grad_x, grad_y, grad_z
+  # If modify_mask is False, this method assumes that mask already consists of only differentiable points
+  # Otherwise it will mask out nondifferentiable points
   
   # We call this twice because first time modifies the mask
   # TODO see if we can handle the nondifferentiable boundary types with more grace
   # Its really that we need a second order scheme for really small structures.
-  bdry_type, bdry_idx, bdry_map = mo.determine_boundary_3d(mask)
-  bdry_type, bdry_idx, bdry_map = mo.determine_boundary_3d(mask)
+  if modify_mask:
+    bdry_type, bdry_idx, bdry_map = mo.determine_boundary_3d(mask, True)
+  bdry_type, bdry_idx, bdry_map = mo.determine_boundary_3d(mask, False)
 
   gradX, gradY, gradZ = gradient_bdry_3d(img, bdry_idx, bdry_map)
   return(gradX, gradY, gradZ)
@@ -1760,6 +1979,7 @@ def eigv_left_shiftrear_idx_3d(eigvecs, idx):
     xx = idx[0][ii]
     yy = idx[1][ii]
     zz = idx[2][ii]
+    pix = eigvecs[xx,yy,zz+1]
     right = eigvecs[xx+1,yy,zz+1]
     right2 = eigvecs[xx+2,yy,zz+1]
     front2 = eigvecs[xx,yy,zz+2]

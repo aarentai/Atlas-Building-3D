@@ -216,14 +216,50 @@ def show_3d_tensors(img, scale=1, title=None, margin=0.05, dpi=80, has_component
 #     ax.plot_surface(x, y, z,  rstride=3, cstride=3,  color=m.to_rgba(indx), linewidth=0.1, alpha=1, shade=True)
 # plt.show()
 
-def view_3d_tensors(tens, mask=None, img=None, paths=None, xrng=None, yrng=None, zrng=None, stride=5, scale=None, viewer=None, has_component_data=False, num_tube_pts=500, tube_radius=0.5):
-  if type(tens) == np.ndarray:
-    nda = tens
-    spacing = [1,1,1]
-  else: 
-    nda = GetNPArrayFromSITK(tens, has_component_data)
-    spacing = tens.GetSpacing()
+def view_3d_paths(img, paths=None, labels=None,xrng=None, yrng=None, zrng=None, viewer=None, num_tube_pts=500, tube_radius=0.5, colors=[]):
+  if xrng is None:
+    xrng = [0, img.shape[0]]
+  if yrng is None:
+    yrng = [0, img.shape[1]]
+  if zrng is None:
+    zrng = [0, img.shape[2]]
+  if labels is None:
+    labels = range(len(paths))
 
+  # wrapping in do_view in case we want to add an interaction to update xrng,yrng,zrng  
+  def do_view(img,paths,labels,xrng,yrng,zrng,colors,viewer=None):  
+    #glyphs = []
+    glyphs = {}
+    if paths is not None:
+      for p, label in zip(paths, labels):
+        tube = path_to_tube(p[0], p[1], p[2], num_tube_pts, tube_radius)
+        #glyphs.append(tube)
+        glyphs[label] = tube
+
+    if viewer:
+      if img is not None:
+        viewer.image = img[xrng[0]:xrng[1],yrng[0]:yrng[1],zrng[0]:zrng[1]]
+        viewer.geometries = glyphs
+    else:
+      if img is not None:
+        viewer = itkview(img[xrng[0]:xrng[1],yrng[0]:yrng[1],zrng[0]:zrng[1]],
+                         geometries=glyphs, geometry_colors=colors)
+      else:
+        viewer = itkview(geometries=glyphs, geometry_colors=colors)
+    return(viewer)
+
+  viewer = do_view(img, paths, labels, xrng, yrng, zrng, colors, viewer)
+ 
+  return(viewer)
+
+def view_3d_tensors(tens, mask=None, img=None, paths=None, xrng=None, yrng=None, zrng=None, stride=5, scale=None, viewer=None, has_component_data=False, num_tube_pts=500, tube_radius=0.5):
+  #if type(tens) == np.ndarray:
+  #  nda = tens
+  #  spacing = [1,1,1]
+  #else: 
+  #  nda = GetNPArrayFromSITK(tens, has_component_data)
+  #  spacing = tens.GetSpacing()
+ 
   if xrng is None:
     xrng = [0, mask.shape[0]]
   if yrng is None:
@@ -231,6 +267,11 @@ def view_3d_tensors(tens, mask=None, img=None, paths=None, xrng=None, yrng=None,
   if zrng is None:
     zrng = [0, mask.shape[2]]
 
+  sml_img = None
+  if img is not None:
+    sml_img = np.zeros_like(img)
+    sml_img[xrng[0]:xrng[1],yrng[0]:yrng[1],zrng[0]:zrng[1]] = img[xrng[0]:xrng[1],yrng[0]:yrng[1],zrng[0]:zrng[1]]
+    
   # wrapping in do_view in case we want to add an interaction to update xrng,yrng,zrng  
   def do_view(tens,mask,img,paths,xrng,yrng,zrng,stride,scale,viewer=None):  
     glyphs = tensors_to_mesh(tens, mask, xrng, yrng, zrng, stride, scale)
@@ -241,11 +282,11 @@ def view_3d_tensors(tens, mask=None, img=None, paths=None, xrng=None, yrng=None,
 
     if viewer:
       if img is not None:
-        viewer.image = img[xrng[0]:xrng[1],yrng[0]:yrng[1],zrng[0]:zrng[1]]
+        viewer.image = sml_img
         viewer.geometries = glyphs
     else:
       if img is not None:
-        viewer = itkview(img[xrng[0]:xrng[1],yrng[0]:yrng[1],zrng[0]:zrng[1]],
+        viewer = itkview(sml_img,
                          geometries=glyphs)
       else:
         viewer = itkview(geometries=glyphs)

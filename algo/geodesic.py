@@ -4,6 +4,7 @@ from lazy_imports import torch
 from util.tensors import circ_shift, tens_interp, direction, circ_shift_3d, tens_interp_3d, direction_3d
 from util.tensors import circ_shift_torch, tens_interp_torch, direction_torch
 from util import diff
+from util import maskops
 from data import io
 
 def get_gamma_ddot_at_point(x, y, Gamma_field, gamma_dot):
@@ -256,8 +257,8 @@ def geodesicpath(tensor_field, mask_image, start_coordinate, initial_velocity, d
       break
 
   if both_directions:
-    geodesicpath_points_x = np.concatenate((geodesicpath_points_x, back_x))
-    geodesicpath_points_y = np.concatenate((geodesicpath_points_y, back_y))
+    geodesicpath_points_x = np.concatenate((geodesicpath_points_x[::-1], back_x))
+    geodesicpath_points_y = np.concatenate((geodesicpath_points_y[::-1], back_y))
     
   if filename:
     io.writePath(geodesicpath_points_x, geodesicpath_points_y, filename)
@@ -494,6 +495,8 @@ def geodesicpath_torch(tensor_field, mask_image, start_coordinate, initial_veloc
 
 
 def geodesicpath_3d(tensor_field, mask_image, start_coordinate, initial_velocity, delta_t=0.15, metric='withoutscaling', iter_num=18000, filename = '', both_directions=False):
+  # Compute 3d geodesic path
+  # Assumes that mask_image is already a differentiable mask
   geodesicpath_points_x = np.zeros((iter_num))
   geodesicpath_points_y = np.zeros((iter_num))
   geodesicpath_points_z = np.zeros((iter_num))
@@ -533,12 +536,21 @@ def geodesicpath_3d(tensor_field, mask_image, start_coordinate, initial_velocity
     eps_23 = eps_23 / det_eps
     eps_33 = eps_33 / det_eps
 
-    d1_eps_11, d2_eps_11, d3_eps_11 = diff.gradient_mask_3d(eps_11, mask_image)
-    d1_eps_12, d2_eps_12, d3_eps_12 = diff.gradient_mask_3d(eps_12, mask_image)
-    d1_eps_13, d2_eps_13, d3_eps_13 = diff.gradient_mask_3d(eps_13, mask_image)
-    d1_eps_22, d2_eps_22, d3_eps_22 = diff.gradient_mask_3d(eps_22, mask_image)
-    d1_eps_23, d2_eps_23, d3_eps_23 = diff.gradient_mask_3d(eps_23, mask_image)
-    d1_eps_33, d2_eps_33, d3_eps_33 = diff.gradient_mask_3d(eps_33, mask_image)
+
+    # d1_eps_11, d2_eps_11, d3_eps_11 = diff.gradient_mask_3d(eps_11, mask_image, False)
+    # d1_eps_12, d2_eps_12, d3_eps_12 = diff.gradient_mask_3d(eps_12, mask_image, False)
+    # d1_eps_13, d2_eps_13, d3_eps_13 = diff.gradient_mask_3d(eps_13, mask_image, False)
+    # d1_eps_22, d2_eps_22, d3_eps_22 = diff.gradient_mask_3d(eps_22, mask_image, False)
+    # d1_eps_23, d2_eps_23, d3_eps_23 = diff.gradient_mask_3d(eps_23, mask_image, False)
+    # d1_eps_33, d2_eps_33, d3_eps_33 = diff.gradient_mask_3d(eps_33, mask_image, False)
+    bdry_type, bdry_idx, bdry_map = maskops.determine_boundary_3d(mask_image, False)
+    d1_eps_11, d2_eps_11, d3_eps_11 = diff.gradient_bdry_3d(eps_11, bdry_idx, bdry_map)
+    d1_eps_12, d2_eps_12, d3_eps_12 = diff.gradient_bdry_3d(eps_12, bdry_idx, bdry_map)
+    d1_eps_13, d2_eps_13, d3_eps_13 = diff.gradient_bdry_3d(eps_13, bdry_idx, bdry_map)
+    d1_eps_22, d2_eps_22, d3_eps_22 = diff.gradient_bdry_3d(eps_22, bdry_idx, bdry_map)
+    d1_eps_23, d2_eps_23, d3_eps_23 = diff.gradient_bdry_3d(eps_23, bdry_idx, bdry_map)
+    d1_eps_33, d2_eps_33, d3_eps_33 = diff.gradient_bdry_3d(eps_33, bdry_idx, bdry_map)
+
     Gamma1_11 = (eps11 * d1_eps_11 + eps12 * (2 * d1_eps_12 - d2_eps_11) + eps13 * (2 * d1_eps_13 - d3_eps_11)) / 2
     Gamma1_12 = (eps11 * d2_eps_11 + eps12 * d1_eps_22 + eps13 * (d1_eps_23 + d2_eps_13 - d3_eps_11)) / 2
     Gamma1_13 = (eps11 * d3_eps_11 + eps12 * (d1_eps_23 + d3_eps_12 - d2_eps_13) + eps13 * (d1_eps_33)) / 2
@@ -637,7 +649,9 @@ def geodesicpath_3d(tensor_field, mask_image, start_coordinate, initial_velocity
   g_ddot_k3 = np.zeros((3))
   g_ddot_k4 = np.zeros((3))
   
+  #for i in range(2, iter_num):
   for i in range(1,iter_num):
+
     # Do Fourth-Order Runge Kutta
     g_ddot_k1 = gamma_ddot[i-1]
     g_dot_k1 = gamma_dot[i-1] + delta_t * g_ddot_k1
@@ -676,7 +690,7 @@ def geodesicpath_3d(tensor_field, mask_image, start_coordinate, initial_velocity
     if (math.ceil(gamma[i, 0]) >= 0 and math.ceil(gamma[i, 0]) < np.size(eps11, 0)
        and math.ceil(gamma[i, 1]) >= 0 and math.ceil(gamma[i, 1])  <np.size(eps11, 1)
        and math.ceil(gamma[i, 2]) >= 0 and math.ceil(gamma[i, 2])  <np.size(eps11, 2)
-       and mask_image[int(math.ceil(gamma[i, 0])), int(math.ceil(gamma[i, 1])), int(math.ceil(gamma[i, 2]))] > 0):
+        and (mask_image[int(math.ceil(gamma[i, 0])), int(math.ceil(gamma[i, 1])), int(math.ceil(gamma[i, 2]))] > 0)):
       geodesicpath_points_x[i-1] = gamma[i, 0]
       geodesicpath_points_y[i-1] = gamma[i, 1]
       geodesicpath_points_z[i-1] = gamma[i, 2]
@@ -688,12 +702,13 @@ def geodesicpath_3d(tensor_field, mask_image, start_coordinate, initial_velocity
       break
 
   if both_directions:
-    geodesicpath_points_x = np.concatenate((geodesicpath_points_x, back_x))
-    geodesicpath_points_y = np.concatenate((geodesicpath_points_y, back_y))
-    geodesicpath_points_z = np.concatenate((geodesicpath_points_z, back_z))
+    geodesicpath_points_x = np.concatenate((geodesicpath_points_x[::-1], back_x))
+    geodesicpath_points_y = np.concatenate((geodesicpath_points_y[::-1], back_y))
+    geodesicpath_points_z = np.concatenate((geodesicpath_points_z[::-1], back_z))
     
   if filename:
     io.writePath3D(geodesicpath_points_x, geodesicpath_points_y, geodesicpath_points_z, filename)
+
   return geodesicpath_points_x, geodesicpath_points_y, geodesicpath_points_z
 # end geodesicpath_3d
 
