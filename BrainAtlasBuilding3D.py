@@ -150,9 +150,9 @@ def fractional_anisotropy(g):
 
 if __name__ == "__main__":
     torch.set_default_tensor_type('torch.DoubleTensor')
-    file_name = [105923,103818]
+    file_name = [105923,103818,111312]
     input_dir = '/usr/sci/projects/HCP/Kris/NSFCRCNS/TestResults/working_3d_python'
-    output_dir = 'BrainAtlas2'
+    output_dir = 'Brain3AtlasMay24'
     height, width, depth = 145,174,145
     sample_num = len(file_name)
     tensor_lin_list, tensor_met_list, mask_list, mask_thresh_list, fa_list = [], [], [], [], []
@@ -161,7 +161,7 @@ if __name__ == "__main__":
     resume = False
    
     start_iter = 0
-    iter_num = 800
+    iter_num = 801
 
     for s in range(len(file_name)):
         tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}/scaled_tensors.nhdr'))
@@ -227,7 +227,7 @@ if __name__ == "__main__":
     #             plot_diffeo(torch.stack((phi_acc_list[s][0, :, 50, :],phi_acc_list[s][2, :, 50, :]),0), step_size=2, show_axis=True)
                 
         '''check point'''
-        if i%1==0:
+        if i%50==0:
             atlas_lin = np.zeros((6,height,width,depth))
             mask_acc = np.zeros((height,width,depth))
             atlas_inv = torch.inverse(atlas)
