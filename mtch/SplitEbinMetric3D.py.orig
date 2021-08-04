@@ -4,7 +4,13 @@ from scipy.linalg import expm, logm
 import warnings
 import matplotlib.pyplot as plt
 from IPython.core.debugger import set_trace
+<<<<<<< HEAD
 from math import pi
+=======
+from torchvectorized import vlinalg
+from torch_sym3eig import Sym3Eig
+from util.diffeo import phi_pullback_3d
+>>>>>>> cf6611ea8145497e3c870f5247d1fcd42b6bbca3
 
 '''
 SplitEbinMetric.py stays the same from Atlas2D to Atlas3D
