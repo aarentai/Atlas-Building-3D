@@ -152,7 +152,7 @@ if __name__ == "__main__":
     torch.set_default_tensor_type('torch.DoubleTensor')
     file_name = [105923,103818,111312]
     input_dir = '/usr/sci/projects/HCP/Kris/NSFCRCNS/TestResults/working_3d_python'
-    output_dir = 'Brain3AtlasMay24'
+    output_dir = 'output/Brain3AtlasMay24'
     height, width, depth = 145,174,145
     sample_num = len(file_name)
     tensor_lin_list, tensor_met_list, mask_list, mask_thresh_list, fa_list = [], [], [], [], []

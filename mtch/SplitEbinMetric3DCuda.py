@@ -5,7 +5,8 @@ import warnings
 import matplotlib.pyplot as plt
 from IPython.core.debugger import set_trace
 from math import pi
-
+from torchvectorized import vlinalg as tv
+from torch_sym3eig import Sym3Eig as se
 '''
 SplitEbinMetric.py stays the same from Atlas2D to Atlas3D
 '''
@@ -14,13 +15,14 @@ def trKsquare(B, A):
     G = torch.linalg.cholesky(B)
     inv_G = torch.inverse(G)
     W = torch.einsum("...ij,...jk,...lk->...il", inv_G, A, inv_G)
-    lamda = torch.symeig(W, eigenvectors=True)[0]
+    lamda , _ = se.apply(W.reshape((-1,3,3)))
+    lamda = lamda.reshape((*W.shape[:-2],3))
     result = torch.sum(torch.log(lamda) ** 2, (-1))
     return result
 
 
 def Squared_distance_Ebin(g0, g1, a, mask):
-#     inputs: g0.shape, g1.shape = [h, w, d, 3, 3]
+#     inputs: g0.shape, g1.shape = [hxwxd, 3, 3]
 #     output: scalar
 #     3.3.4 https://www.cs.utah.edu/~haocheng/notes/NoteonMatching.pdf
     inv_g0_g1 = torch.einsum("...ik,...kj->...ij", torch.inverse(g0), g1)
@@ -32,16 +34,14 @@ def Squared_distance_Ebin(g0, g1, a, mask):
 
 
 def logm_invB_A(B, A):
-#     inputs: A/B.shape = [h, w, d, 3, 3]
-#     output: shape = [h, w, d, 3, 3]
+    import SimpleITK as sitk
+#     inputs: A/B.shape = [hxwxd, 3, 3]
+#     output: shape = [hxwxd, 3, 3]
     G = torch.linalg.cholesky(B)
-    torch.linalg.cholesky(A)
     inv_G = torch.inverse(G)
     W = torch.einsum("...ij,...jk,...lk->...il", inv_G, A, inv_G)
-    lamda, Q = torch.symeig(W, eigenvectors=True)
+    lamda, Q = se.apply(W)
     log_lamda = torch.zeros((*lamda.shape, lamda.shape[-1]),dtype=torch.double)
-    # for i in range(lamda.shape[-1]):
-    #     log_lamda[:, i, i] = torch.log(lamda[:, i])
     log_lamda = torch.diag_embed(torch.log(lamda))
     V = torch.einsum('...ji,...jk->...ik', inv_G, Q)
     inv_V = torch.inverse(V)
@@ -267,6 +267,7 @@ def get_karcher_mean(G, a):
     G = G.reshape(size[0], -1, *size[-2:])  # (T,-1,3,3)
     gm = G[0]
     for i in range(1, G.size(0)):
+#         print('logm_invB_A')
         U = logm_invB_A(gm, G[i])
         UTrless = U - torch.einsum("...ii,kl->...kl", U, torch.eye(size[-1], dtype=torch.double)) / size[
             -1]  # (...,2,2)
@@ -276,13 +277,17 @@ def get_karcher_mean(G, a):
 
         # when g1 = 0, len(Ind_notInRange) and len(Ind_inRange) are both zero. So check len(Ind_notInRange) first
         if len(Ind_notInRange) == 0:  # all in the range
+#             print('Rie_Exp_extended')
             gm = Rie_Exp_extended(gm, inv_RieExp_extended(gm, G[i], a) / (i + 1), a)
         elif len(Ind_inRange) == 0:  # all not in range
+#             print('ptPick_notInRange')
             gm = ptPick_notInRange(gm, G[i], i)
         else:
+#             print('Rie_Exp_extended, ptPick_notInRange')
             gm[Ind_inRange] = Rie_Exp_extended(gm[Ind_inRange],
                                                inv_RieExp_extended(gm[Ind_inRange], G[i, Ind_inRange], a) / (i + 1),
                                                a)  # stop here
             gm[Ind_notInRange] = ptPick_notInRange(gm[Ind_notInRange], G[i, Ind_notInRange], i)
+#             print('end')
 
     return gm.reshape(*size[1:])

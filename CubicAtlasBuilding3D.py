@@ -152,7 +152,7 @@ if __name__ == "__main__":
     torch.set_default_tensor_type('torch.DoubleTensor')
     file_name = [1,2,4,6]
     input_dir = '/usr/sci/projects/HCP/Kris/NSFCRCNS/TestResults/working_3d_python'
-    output_dir = 'Cubic1246AtlasMay22'
+    output_dir = 'output/Cubic1246AtlasNoalpha'
     height, width, depth = 100,100,41
     sample_num = len(file_name)
     tensor_lin_list, tensor_met_list, mask_list, mask_thresh_list, fa_list = [], [], [], [], []
@@ -161,10 +161,10 @@ if __name__ == "__main__":
     resume = False
    
     start_iter = 0
-    iter_num = 800
+    iter_num = 801
 
     for s in range(len(file_name)):
-        tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/cubic{file_name[s]}_scaled_tensors.nhdr'))
+        tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/cubic{file_name[s]}_orig_tensors.nhdr'))
         mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/cubic{file_name[s]}_filt_mask.nhdr'))
         tensor_lin_list.append(torch.from_numpy(tensor_np).double().permute(3,2,1,0))
     #     create union of masks

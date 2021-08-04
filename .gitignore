@@ -4,11 +4,5 @@
 __pycache__/
 .ipynb_checkpoints/
 .vscode/
-BrainAtlasMay21/
-Cubic46Geo/
-Cubic1246Atlas/
-Cubic1246Atlas2e-3/
-Cubic1246Atlas4e-4/
-Cubic1246AtlasMay11/
-Cubic1246AtlasMay17/
-Cubic1246AtlasMay22/
+Brain3AtlasMay24/
+output/

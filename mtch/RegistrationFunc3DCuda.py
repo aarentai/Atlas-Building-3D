@@ -17,7 +17,7 @@ def get_div(v):
 #     v_x = (torch.roll(v[2], shifts=(-1, 0, 0), dims=(0, 1, 2))
 #            - torch.roll(v[2], shifts=(-1, 0, 0), dims=(0, 1, 2))) / 2
 # 4.7 version
-    print('div')
+#     print('div')
     v_x = (torch.roll(v[0], shifts=(-1, 0, 0), dims=(0, 1, 2))
            - torch.roll(v[0], shifts=(-1, 0, 0), dims=(0, 1, 2))) / 2
     v_y = (torch.roll(v[1], shifts=(0, -1, 0), dims=(0, 1, 2))
@@ -36,7 +36,7 @@ def get_jacobian_determinant(diffeo):  # diffeo: 3 x size_h x size_w x size_d
 
 
 def get_jacobian_matrix(diffeo):  # diffeo: 3 x size_h x size_w x size_d
-    return torch.stack((get_gradient(diffeo[0]), get_gradient(diffeo[1]), get_gradient(diffeo[2])))
+    return torch.stack((get_gradient(diffeo[0]), get_gradient(diffeo[1]), get_gradient(diffeo[2]))).to(device=torch.device('cuda'))
 
 
 def get_gradient(F):  # 3D F: size_h x size_w x size_d
@@ -64,7 +64,7 @@ def get_gradient(F):  # 3D F: size_h x size_w x size_d
            - torch.roll(F_padded, shifts=(0, 0, 1), dims=(0, 1, 2))) / 2
     return torch.stack((F_x[1:-1, 1:-1, 1:-1],
                         F_y[1:-1, 1:-1, 1:-1],
-                        F_z[1:-1, 1:-1, 1:-1])).type(torch.DoubleTensor)
+                        F_z[1:-1, 1:-1, 1:-1])).type(torch.DoubleTensor).to(device=torch.device('cuda'))
 
 
 # get the identity mapping
@@ -73,7 +73,7 @@ def get_idty(size_h, size_w, size_d):
                                  torch.arange(size_w),#, dtype=torch.double
                                  torch.arange(size_d)])#, dtype=torch.double
 # original and 4.3
-    return torch.stack((HH, WW, DD)).double() #.half()
+    return torch.stack((HH, WW, DD)).double().to(device=torch.device('cuda')) #.half()
 # 4.7
 #     return torch.stack((DD, WW, HH)).double() #.half()
 
@@ -85,7 +85,7 @@ def compose_function(f, diffeo, mode='periodic'):  # f: N x h x w x d  diffeo: 3
 #     original and 4.3
     Ind_diffeo = torch.stack((torch.floor(diffeo[0]).long() % size_h,
                               torch.floor(diffeo[1]).long() % size_w,
-                              torch.floor(diffeo[2]).long() % size_d))
+                              torch.floor(diffeo[2]).long() % size_d)).to(device=torch.device('cuda'))
 #     4.7
 #     Ind_diffeo = torch.stack((torch.floor(diffeo[2]).long() % size_h,
 #                               torch.floor(diffeo[1]).long() % size_w,
@@ -137,4 +137,4 @@ def compose_function(f, diffeo, mode='periodic'):  # f: N x h x w x d  diffeo: 3
 
 #     del F000, F010, F100, F110, F001, F011, F101, F111, C, D, E
 #     torch.cuda.empty_cache()
-    return interp_f
+    return interp_f.to(device=torch.device('cuda'))
