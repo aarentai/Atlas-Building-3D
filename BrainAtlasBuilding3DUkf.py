@@ -150,10 +150,11 @@ def fractional_anisotropy(g):
 
 if __name__ == "__main__":
     torch.set_default_tensor_type('torch.DoubleTensor')
-    file_name = [1,2,4,6]
-    input_dir = '/usr/sci/projects/HCP/Kris/NSFCRCNS/TestResults/working_3d_python'
-    output_dir = 'output/Cubic1246AtlasNoalpha'
-    height, width, depth = 100,100,41
+    file_name = [108222, 102715, 105923]
+    # file_name = [107422, 100206, 104416]
+    input_dir = '/usr/sci/projects/HCP/Kris/NSFCRCNS/TestResults/UKF_experiments'
+    output_dir = 'output/BrainAtlasUkf'
+    height, width, depth = 145,174,145
     sample_num = len(file_name)
     tensor_lin_list, tensor_met_list, mask_list, mask_thresh_list, fa_list = [], [], [], [], []
     mask_union = torch.zeros(height, width, depth).double()
@@ -164,8 +165,8 @@ if __name__ == "__main__":
     iter_num = 801
 
     for s in range(len(file_name)):
-        tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/cubic{file_name[s]}_orig_tensors.nhdr'))
-        mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/cubic{file_name[s]}_filt_mask.nhdr'))
+        tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_scaled_tensors.nhdr'))
+        mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_filt_mask.nhdr'))
         tensor_lin_list.append(torch.from_numpy(tensor_np).double().permute(3,2,1,0))
     #     create union of masks
         mask_union += torch.from_numpy(mask_np).double().permute(2,1,0)
@@ -186,7 +187,8 @@ if __name__ == "__main__":
         # fa_list.append(fractional_anisotropy(tensor_met_zeros))
         tensor_met_list.append(torch.inverse(tensor_met_zeros))
         # fore_back_adaptor = torch.ones((height,width,depth))
-        fore_back_adaptor = torch.ones((height,width,depth))
+        # fore_back_adaptor = torch.where(torch.det(tensor_met_list[s])>1e1, 5e-4, 1.)
+        fore_back_adaptor = torch.where(torch.det(tensor_met_list[s])>1e2, 1e-3, 1.)
         mask_thresh_list.append(fore_back_adaptor)
         tensor_met_list[s] = torch.einsum('ijk...,lijk->ijk...', tensor_met_list[s], mask_thresh_list[s].unsqueeze(0))
     #     initialize the accumulative diffeomorphism    
@@ -208,7 +210,7 @@ if __name__ == "__main__":
 
     for i in tqdm(range(start_iter, start_iter+iter_num)):
         G = torch.stack(tuple(tensor_met_list))
-        dim, sigma, epsilon, iter_num = 3., 0, 4e-3, 1 # epsilon = 3e-3 for orig tensor
+        dim, sigma, epsilon, iter_num = 3., 0, 5e-3, 1 # epsilon = 3e-3 for orig tensor
         atlas = get_karcher_mean(G, 1./dim)
 
         phi_inv_list, phi_list = [], []
@@ -231,16 +233,16 @@ if __name__ == "__main__":
             atlas_lin = np.zeros((6,height,width,depth))
             mask_acc = np.zeros((height,width,depth))
             atlas_inv = torch.inverse(atlas)
-            atlas_lin[0] = atlas_inv[:,:,:,0,0].cpu()
-            atlas_lin[1] = atlas_inv[:,:,:,0,1].cpu()
-            atlas_lin[2] = atlas_inv[:,:,:,0,2].cpu()
-            atlas_lin[3] = atlas_inv[:,:,:,1,1].cpu()
-            atlas_lin[4] = atlas_inv[:,:,:,1,2].cpu()
-            atlas_lin[5] = atlas_inv[:,:,:,2,2].cpu()
+            atlas_lin[0] = atlas_inv[:,:,:,0,0]
+            atlas_lin[1] = atlas_inv[:,:,:,0,1]
+            atlas_lin[2] = atlas_inv[:,:,:,0,2]
+            atlas_lin[3] = atlas_inv[:,:,:,1,1]
+            atlas_lin[4] = atlas_inv[:,:,:,1,2]
+            atlas_lin[5] = atlas_inv[:,:,:,2,2]
             for s in range(sample_num):
-                sio.savemat(f'{output_dir}/cubic{file_name[s]}_{i}_phi_inv.mat', {'diffeo': phi_inv_acc_list[s].cpu().detach().numpy()})
-                sio.savemat(f'{output_dir}/cubic{file_name[s]}_{i}_phi.mat', {'diffeo': phi_acc_list[s].cpu().detach().numpy()})
-                sio.savemat(f'{output_dir}/cubic{file_name[s]}_{i}_energy.mat', {'energy': energy_list[s]})
+                sio.savemat(f'{output_dir}/{file_name[s]}_{i}_phi_inv.mat', {'diffeo': phi_inv_acc_list[s].detach().numpy()})
+                sio.savemat(f'{output_dir}/{file_name[s]}_{i}_phi.mat', {'diffeo': phi_acc_list[s].detach().numpy()})
+                sio.savemat(f'{output_dir}/{file_name[s]}_{i}_energy.mat', {'energy': energy_list[s]})
     #             plt.plot(energy_list[s])
                 mask_acc += mask_list[s].numpy()
             mask_acc[mask_acc>0]=1
@@ -251,20 +253,20 @@ if __name__ == "__main__":
     mask_acc = np.zeros((height,width,depth))
 
     for s in range(sample_num):
-        sio.savemat(f'{output_dir}/{file_name[s]}_phi_inv.mat', {'diffeo': phi_inv_acc_list[s]..cpu()detach().numpy()})
-        sio.savemat(f'{output_dir}/{file_name[s]}_phi.mat', {'diffeo': phi_acc_list[s].cpu().detach().numpy()})
+        sio.savemat(f'{output_dir}/{file_name[s]}_phi_inv.mat', {'diffeo': phi_inv_acc_list[s].detach().numpy()})
+        sio.savemat(f'{output_dir}/{file_name[s]}_phi.mat', {'diffeo': phi_acc_list[s].detach().numpy()})
         sio.savemat(f'{output_dir}/{file_name[s]}_energy.mat', {'energy': energy_list[s]})
         
         plt.plot(energy_list[s])
         mask_acc += mask_list[s].numpy()
 
     atlas = torch.inverse(atlas)
-    atlas_lin[0] = atlas[:,:,:,0,0].cpu()
-    atlas_lin[1] = atlas[:,:,:,0,1].cpu()
-    atlas_lin[2] = atlas[:,:,:,0,2].cpu()
-    atlas_lin[3] = atlas[:,:,:,1,1].cpu()
-    atlas_lin[4] = atlas[:,:,:,1,2].cpu()
-    atlas_lin[5] = atlas[:,:,:,2,2].cpu()
+    atlas_lin[0] = atlas[:,:,:,0,0]
+    atlas_lin[1] = atlas[:,:,:,0,1]
+    atlas_lin[2] = atlas[:,:,:,0,2]
+    atlas_lin[3] = atlas[:,:,:,1,1]
+    atlas_lin[4] = atlas[:,:,:,1,2]
+    atlas_lin[5] = atlas[:,:,:,2,2]
     mask_acc[mask_acc>0]=1
     sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_lin,(3,2,1,0))), f'{output_dir}/atlas_tens.nhdr')
     sitk.WriteImage(sitk.GetImageFromArray(np.transpose(mask_union,(2,1,0))), f'{output_dir}/atlas_mask.nhdr')

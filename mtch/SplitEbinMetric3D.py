@@ -11,32 +11,11 @@ SplitEbinMetric.py stays the same from Atlas2D to Atlas3D
 '''
 
 def trKsquare(B, A):
-    G = torch.linalg.cholesky(B)
+    G = torch.cholesky(B)
     inv_G = torch.inverse(G)
     W = torch.einsum("...ij,...jk,...lk->...il", inv_G, A, inv_G)
-    #----
-    # orig method
-    #----
     lamda = torch.symeig(W, eigenvectors=True)[0]
     result = torch.sum(torch.log(lamda) ** 2, (-1))
-    #----
-    # vlinalg
-    #----
-    ##vlinalg needs shape [1,9,h,w,d]
-    #lamda = vlinalg.vSymEig(W.permute((3,4,0,1,2)).reshape((1,9,*W.shape[0:3])), eigenvectors=False)[0]
-    #result = torch.sum(torch.log(lamda.reshape((3,*W.shape[0:3])).permute((1,2,3,0))) ** 2, (-1))
-    #lamda_diff = torch.abs(lamda.reshape((3,*W.shape[0:3])).permute((1,2,3,0)) - torch.symeig(W, eigenvectors=True)[0])
-    #print('trKsquare new',lamda.shape,result.shape,torch.max(lamda), torch.min(lamda))
-    #----
-    # Sym3Eig
-    #----
-    #print('W shape', W.shape, W.reshape((-1,3,3)).shape)
-    #lamda = Sym3Eig.apply(W.reshape((-1,3,3)))[0].reshape((*W.shape[0:3],3))
-    #result = torch.sum(torch.log(lamda) ** 2, (-1))
-    #print('trKsquare new',lamda.shape,result.shape,torch.max(lamda), torch.min(lamda))
-    # ----
-    # End various methods
-    # ----
     return result
 
 
@@ -46,38 +25,20 @@ def Squared_distance_Ebin(g0, g1, a, mask):
 #     3.3.4 https://www.cs.utah.edu/~haocheng/notes/NoteonMatching.pdf
     inv_g0_g1 = torch.einsum("...ik,...kj->...ij", torch.inverse(g0), g1)
     trK0square = trKsquare(g0, g1) - torch.log(torch.det(inv_g0_g1)) ** 2 *a  # torch.log(torch.det(inv_g0_g1) + 1e-25)
-    theta = torch.min((trK0square / a + 1e-40).sqrt() / 4., torch.tensor(np.pi, dtype=torch.double))  
+    theta = torch.min((trK0square / a + 1e-13).sqrt() / 4., torch.tensor(np.pi, dtype=torch.double))  # change 1e-40 to 1e-14, because there is only one negative error of 1e-15 in UKF brain experiment
     alpha, beta = torch.det(g0).pow(1. / 4.), torch.det(g1).pow(1. / 4.)
     E = 16 * a * (alpha ** 2 - 2 * alpha * beta * torch.cos(theta) + beta ** 2)
     return torch.einsum("hwd,hwd->", E, mask)
 
-def energy_ebin(phi, g0, g1, f0, f1, sigma, dim, mask): 
-#     input: phi.shape = [3, h, w, d]; g0/g1/f0/f1.shape = [h, w, d, 3, 3]; sigma/dim = scalar; mask.shape = [1, h, w, d]
-#     output: scalar
-# the phi here is identity
-    phi_star_g1 = phi_pullback_3d(phi, g1)
-    phi_star_f1 = phi_pullback_3d(phi, f1)# the compose operation in this step uses a couple of thousands MB of memory
-    E1 = sigma * Squared_distance_Ebin(f0, phi_star_f1, 1./dim, mask)
-    E2 = Squared_distance_Ebin(g0, phi_star_g1, 1./dim, mask)
-    return E1 + E2
-
-def energy_ebin_no_phi(g0, g1, f0, f1, sigma, dim, mask): 
-#     input: g0/g1/f0/f1.shape = [h, w, d, 3, 3]; sigma/dim = scalar; mask.shape = [1, h, w, d]
-#     output: scalar
-# the phi here is assumed identity, so does not need to be provided in order to save memory
-    #phi_star_g1 = phi_pullback_3d(phi, g1)
-    #phi_star_f1 = phi_pullback_3d(phi, f1)# the compose operation in this step uses a couple of thousands MB of memory
-    E1 = sigma * Squared_distance_Ebin(f0, f1, 1./dim, mask)
-    E2 = Squared_distance_Ebin(g0, g1, 1./dim, mask)
-    return E1 + E2
 
 def logm_invB_A(B, A):
 #     inputs: A/B.shape = [h, w, d, 3, 3]
 #     output: shape = [h, w, d, 3, 3]
-    G = torch.linalg.cholesky(B)
-    torch.linalg.cholesky(A)
+    G = torch.cholesky(B)
+#     torch.linalg.cholesky(A)
     inv_G = torch.inverse(G)
     W = torch.einsum("...ij,...jk,...lk->...il", inv_G, A, inv_G)
+#     set_trace()
     lamda, Q = torch.symeig(W, eigenvectors=True)
     log_lamda = torch.zeros((*lamda.shape, lamda.shape[-1]),dtype=torch.double)
     # for i in range(lamda.shape[-1]):

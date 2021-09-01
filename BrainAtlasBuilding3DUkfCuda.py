@@ -4,14 +4,15 @@ import numpy as np
 import scipy.io as sio
 import matplotlib.pyplot as plt
 import SimpleITK as sitk
+import os
 from lazy_imports import itkwidgets
 from lazy_imports import itkview
 from lazy_imports import interactive
 from lazy_imports import ipywidgets
 from lazy_imports import pv
 
-from mtch.RegistrationFunc3D import *
-from mtch.SplitEbinMetric3D import *
+from mtch.RegistrationFunc3DCuda import *
+from mtch.SplitEbinMetric3DCuda import *
 from mtch.GeoPlot import *
 
 # from Packages.disp.vis import show_2d, show_2d_tensors
@@ -24,6 +25,7 @@ import algo.metricModSolver2d as mms
 import algo.geodesic as geo
 import algo.euler as euler
 import algo.dijkstra as dijkstra
+from torch_sym3eig import Sym3Eig as se
 
 
 def phi_pullback(phi, g):
@@ -92,7 +94,7 @@ def laplace_inverse(u):
     vy = torch.from_numpy(np.real(np.fft.ifftn(fy)))
     vz = torch.from_numpy(np.real(np.fft.ifftn(fz)))
 
-    return torch.stack((vx, vy, vz))#.to(device=torch.device('cuda'))
+    return torch.stack((vx, vy, vz)).to(device=torch.device('cuda'))
 
         
 def metric_matching(gi, gm, height, width, depth, mask, iter_num, epsilon, sigma, dim):
@@ -108,6 +110,8 @@ def metric_matching(gi, gm, height, width, depth, mask, iter_num, epsilon, sigma
         phi_actsf0 = phi_pullback(phi_inv, f0)
         E = energy_ebin(idty, phi_actsg0, gm, phi_actsf0, f1, sigma, dim, mask) 
         print(E.item())
+        if torch.isnan(E):
+            raise ValueError('NaN error')
         E.backward()
         v = - laplace_inverse(idty.grad)
         with torch.no_grad():
@@ -129,13 +133,15 @@ def metric_matching(gi, gm, height, width, depth, mask, iter_num, epsilon, sigma
     return gi, phi, phi_inv
 
 
-def tensor_cleaning(g, scale_factor):
-    abnormal_map = torch.where(torch.det(g)>4,1.,0.)
-    background = torch.einsum("mno,ij->mnoij", torch.ones(*tensor_met_zeros.shape[:3]), torch.eye(3))*scale_factor
-#     return torch.einsum('ijk...,lijk->ijk...', g, 1.-abnormal_map.unsqueeze(0))+\
-#             torch.einsum('ijk...,lijk->ijk...', background, abnormal_map.unsqueeze(0))
-    return torch.einsum('ijk...,lijk->ijk...', g, 1.-abnormal_map.unsqueeze(0))+\
-            torch.einsum('ijk...,lijk->ijk...', g, (abnormal_map/torch.det(g)).unsqueeze(0))
+def tensor_cleaning(g, det_threshold=1e-11):
+    g[torch.det(g)<=det_threshold] = torch.eye((3))
+    # Sylvester's criterion https://en.wikipedia.org/wiki/Sylvester%27s_criterion
+    psd_map = torch.where(g[...,0,0]>0, 1, 0) + torch.where(torch.det(g[...,:2,:2])>0, 1, 0) + torch.where(torch.det(g)>0, 1, 0)
+    nonpsd_idx = torch.where(psd_map!=3)
+    # nonpsd_idx = torch.where(torch.isnan(torch.sum(batch_cholesky(g), (3,4))))
+    for i in range(len(nonpsd_idx[0])):
+        g[nonpsd_idx[0][i], nonpsd_idx[1][i], nonpsd_idx[2][i]] = torch.eye((3))
+    return g
 
     
 def fractional_anisotropy(g):
@@ -148,15 +154,111 @@ def fractional_anisotropy(g):
     torch.sqrt(2.*(torch.pow(lambd1,2)+torch.pow(lambd2,2)+torch.pow(lambd3,2)))
 
 
+def get_framework(arr):
+      # return np or torch depending on type of array
+    # also returns framework name as "numpy" or "torch"
+    fw = None
+    fw_name = ''
+    if type(arr) == np.ndarray:
+        fw = np
+        fw_name = 'numpy'
+    else:
+        fw = torch
+        fw_name = 'torch'
+    return (fw, fw_name)
+
+
+def batch_cholesky(tens):
+    # from https://stackoverflow.com/questions/60230464/pytorch-torch-cholesky-ignoring-exception
+    # will get NaNs instead of exception where cholesky is invalid
+    fw, fw_name = get_framework(tens)
+    L = fw.zeros_like(tens)
+
+    for i in range(tens.shape[-1]):
+        for j in range(i+1):
+            s = 0.0
+        for k in range(j):
+            s = s + L[...,i,k] * L[...,j,k]
+
+        L[...,i,j] = fw.sqrt(tens[...,i,i] - s) if (i == j) else \
+                      (1.0 / L[...,j,j] * (tens[...,i,j] - s))
+    return L
+
+
+def make_pos_def(tens, mask, small_eval = 0.00005):
+  # make any small or negative eigenvalues slightly positive and then reconstruct tensors
+  
+    fw, fw_name = get_framework(tens)
+    if fw_name == 'numpy':
+        sym_tens = (tens + tens.transpose(0,1,2,4,3))/2
+        evals, evecs = np.linalg.eig(sym_tens)
+    else:
+        sym_tens = (tens + torch.transpose(tens,3,4))/2
+        # evals, evecs = torch.symeig(sym_tens,eigenvectors=True)
+        evals, evecs = se.apply(sym_tens.reshape((-1,3,3)))
+    evals = evals.reshape((*tens.shape[:-2],3))
+    evecs = evecs.reshape((*tens.shape[:-2],3,3))
+    #cmplx_evals, cmplx_evecs = fw.linalg.eig(sym_tens)
+    #evals = fw.real(cmplx_evals)
+    #evecs = fw.real(cmplx_evecs)
+    #np.abs(evals, out=evals)
+    idx = fw.where(evals < small_eval)
+    small_map = fw.where(evals < small_eval,1,0)
+    #idx = np.where(evals < 0)
+    num_found = 0
+    #print(len(idx[0]), 'tensors found with eigenvalues <', small_eval)
+    for ee in range(len(idx[0])):
+        if mask[idx[0][ee], idx[1][ee], idx[2][ee]]:
+            num_found += 1
+            # If largest eigenvalue is negative, replace with identity
+            eval_2 = (idx[3][ee]+1) % 3
+            eval_3 = (idx[3][ee]+2) % 3
+        if ((evals[idx[0][ee], idx[1][ee], idx[2][ee], eval_2] < 0) and 
+         (evals[idx[0][ee], idx[1][ee], idx[2][ee], eval_3] < 0)):
+            evecs[idx[0][ee], idx[1][ee], idx[2][ee]] = fw.eye(3, dtype=tens.dtype)
+            evals[idx[0][ee], idx[1][ee], idx[2][ee], idx[3][ee]] = small_eval
+        else:
+            # otherwise just set this eigenvalue to small_eval
+            evals[idx[0][ee], idx[1][ee], idx[2][ee], idx[3][ee]] = small_eval
+
+    print(num_found, 'tensors found with eigenvalues <', small_eval)
+    #print(num_found, 'tensors found with eigenvalues < 0')
+    mod_tens = fw.einsum('...ij,...jk,...k,...lk->...il',
+                       evecs, fw.eye(3, dtype=tens.dtype), evals, evecs)
+    #mod_tens = fw.einsum('...ij,...j,...jk->...ik',
+    #                     evecs, evals, evecs)
+
+    chol = batch_cholesky(mod_tens)
+    idx_nan = torch.where(torch.isnan(chol))
+    nan_map = torch.where(torch.isnan(chol),1,0)
+    iso_tens = small_eval * torch.eye((3))
+    for pt in range(len(idx_nan[0])):
+        mod_tens[idx_nan[0][pt],idx_nan[1][pt],idx_nan[2][pt]] = iso_tens
+    # if torch.norm(torch.transpose(mod_tens,3,4)-mod_tens)>0:
+    #     print('asymmetric')
+    mod_tens[:,:,:,1,0]=mod_tens[:,:,:,0,1]
+    mod_tens[:,:,:,2,0]=mod_tens[:,:,:,0,2]
+    mod_tens[:,:,:,2,1]=mod_tens[:,:,:,1,2]
+    return(mod_tens)
+
+
 if __name__ == "__main__":
-    torch.set_default_tensor_type('torch.DoubleTensor')
-    file_name = [1,2,4,6]
-    input_dir = '/usr/sci/projects/HCP/Kris/NSFCRCNS/TestResults/working_3d_python'
-    output_dir = 'output/Cubic1246AtlasNoalpha'
-    height, width, depth = 100,100,41
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # after switch device, you need restart the script
+    torch.cuda.set_device('cuda:0')
+    torch.set_default_tensor_type('torch.cuda.DoubleTensor')
+
+    # file_name = []
+    file_name = [108222, 102715, 105923, 107422, 100206, 104416]
+    input_dir = '/usr/sci/projects/HCP/Kris/NSFCRCNS/TestResults/UKF_experiments/BallResults'
+    output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasUkfBallAug27Unsmoothed'
+    # output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasUkfBallAug27ScaledOrig'
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
+    height, width, depth = 145,174,145
     sample_num = len(file_name)
-    tensor_lin_list, tensor_met_list, mask_list, mask_thresh_list, fa_list = [], [], [], [], []
-    mask_union = torch.zeros(height, width, depth).double()
+    tensor_lin_list, tensor_met_list, mask_list, mask_thresh_list, fa_list, img_list = [], [], [], [], [], []
+    mask_union = torch.zeros(height, width, depth).double().to(device)
     phi_inv_acc_list, phi_acc_list, energy_list = [], [], []
     resume = False
    
@@ -164,12 +266,17 @@ if __name__ == "__main__":
     iter_num = 801
 
     for s in range(len(file_name)):
-        tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/cubic{file_name[s]}_orig_tensors.nhdr'))
-        mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/cubic{file_name[s]}_filt_mask.nhdr'))
+        # print(f'{s} is processing.')
+        tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_scaled_unsmoothed_tensors.nhdr'))
+        mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_filt_mask.nhdr'))
+        # tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_scaled_orig_tensors.nhdr'))
+        # mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_orig_mask.nhdr'))
+        # img_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_T1_flip_y.nhdr'))
         tensor_lin_list.append(torch.from_numpy(tensor_np).double().permute(3,2,1,0))
     #     create union of masks
-        mask_union += torch.from_numpy(mask_np).double().permute(2,1,0)
+        mask_union += torch.from_numpy(mask_np).double().permute(2,1,0).to(device)
         mask_list.append(torch.from_numpy(mask_np).double().permute(2,1,0))
+        # img_list.append(torch.from_numpy(img_np).double().permute(2,1,0))
     #     rearrange tensor_lin to tensor_met
         tensor_met_zeros = torch.zeros(height,width,depth,3,3,dtype=torch.float64)
         tensor_met_zeros[:,:,:,0,0] = tensor_lin_list[s][0]
@@ -181,12 +288,17 @@ if __name__ == "__main__":
         tensor_met_zeros[:,:,:,2,0] = tensor_lin_list[s][2]
         tensor_met_zeros[:,:,:,2,1] = tensor_lin_list[s][4]
         tensor_met_zeros[:,:,:,2,2] = tensor_lin_list[s][5]
+        # tensor_met_zeros = make_pos_def(tensor_met_zeros, torch.ones((height, width, depth)))
     #     balance the background and subject by rescaling
-        # tensor_met_zeros = tensor_cleaning(tensor_met_zeros, scale_factor=torch.tensor(1,dtype=torch.float64))
+        tensor_met_zeros = tensor_cleaning(tensor_met_zeros)#, scale_factor=torch.tensor(1,dtype=torch.float64)
         # fa_list.append(fractional_anisotropy(tensor_met_zeros))
         tensor_met_list.append(torch.inverse(tensor_met_zeros))
+        tensor_met_list[s][:,:,:,0,1] = tensor_met_list[s][:,:,:,1,0]
+        tensor_met_list[s][:,:,:,0,2] = tensor_met_list[s][:,:,:,2,0]
+        tensor_met_list[s][:,:,:,1,2] = tensor_met_list[s][:,:,:,2,1]
         # fore_back_adaptor = torch.ones((height,width,depth))
-        fore_back_adaptor = torch.ones((height,width,depth))
+        # fore_back_adaptor = torch.where(torch.det(tensor_met_list[s])>1e1, 5e-4, 1.)
+        fore_back_adaptor = torch.where(torch.det(tensor_met_list[s])>1e2, 1e-3, 1.)#
         mask_thresh_list.append(fore_back_adaptor)
         tensor_met_list[s] = torch.einsum('ijk...,lijk->ijk...', tensor_met_list[s], mask_thresh_list[s].unsqueeze(0))
     #     initialize the accumulative diffeomorphism    
@@ -203,19 +315,25 @@ if __name__ == "__main__":
         
     mask_union[mask_union>0] = 1
 
-
+    print(f'file_name = {file_name}, iter_num = {iter_num}, epsilon = 5e-3')
     print(f'Starting from iteration {start_iter} to iteration {iter_num+start_iter}')
 
     for i in tqdm(range(start_iter, start_iter+iter_num)):
         G = torch.stack(tuple(tensor_met_list))
-        dim, sigma, epsilon, iter_num = 3., 0, 4e-3, 1 # epsilon = 3e-3 for orig tensor
+        # for i in range(G.shape[0]):
+        #     G[i] = tensor_cleaning(G[i])
+        #     print(f'{i} cleaned')
+        dim, sigma, epsilon, iter_num = 3., 0, 5e-3, 1 # epsilon = 3e-3 for orig tensor
         atlas = get_karcher_mean(G, 1./dim)
+        # atlas = tensor_cleaning(atlas)
+        # mean_img = get_euclidean_mean(img_list)
 
         phi_inv_list, phi_list = [], []
         for s in range(sample_num):
             energy_list[s].append(torch.einsum("ijk...,lijk->",[(tensor_met_list[s] - atlas)**2, mask_union.unsqueeze(0)]).item())
             old = tensor_met_list[s]
             tensor_met_list[s], phi, phi_inv = metric_matching(tensor_met_list[s], atlas, height, width, depth, mask_union, iter_num, epsilon, sigma,dim)
+            # tensor_met_list[s] = tensor_cleaning(tensor_met_list[s])
             phi_inv_list.append(phi_inv)
             phi_list.append(phi)
             phi_inv_acc_list[s] = compose_function(phi_inv_acc_list[s], phi_inv_list[s])
@@ -238,25 +356,25 @@ if __name__ == "__main__":
             atlas_lin[4] = atlas_inv[:,:,:,1,2].cpu()
             atlas_lin[5] = atlas_inv[:,:,:,2,2].cpu()
             for s in range(sample_num):
-                sio.savemat(f'{output_dir}/cubic{file_name[s]}_{i}_phi_inv.mat', {'diffeo': phi_inv_acc_list[s].cpu().detach().numpy()})
-                sio.savemat(f'{output_dir}/cubic{file_name[s]}_{i}_phi.mat', {'diffeo': phi_acc_list[s].cpu().detach().numpy()})
-                sio.savemat(f'{output_dir}/cubic{file_name[s]}_{i}_energy.mat', {'energy': energy_list[s]})
+                sio.savemat(f'{output_dir}/{file_name[s]}_{i}_phi_inv.mat', {'diffeo': phi_inv_acc_list[s].cpu().detach().numpy()})
+                sio.savemat(f'{output_dir}/{file_name[s]}_{i}_phi.mat', {'diffeo': phi_acc_list[s].cpu().detach().numpy()})
+                sio.savemat(f'{output_dir}/{file_name[s]}_{i}_energy.mat', {'energy': energy_list[s]})
     #             plt.plot(energy_list[s])
-                mask_acc += mask_list[s].numpy()
+                mask_acc += mask_list[s].cpu().numpy()
             mask_acc[mask_acc>0]=1
             sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_lin,(3,2,1,0))), f'{output_dir}/atlas_{i}_tens.nhdr')
-            sitk.WriteImage(sitk.GetImageFromArray(np.transpose(mask_union,(2,1,0))), f'{output_dir}/atlas_{i}_mask.nhdr')
+            sitk.WriteImage(sitk.GetImageFromArray(np.transpose(mask_union.cpu(),(2,1,0))), f'{output_dir}/atlas_{i}_mask.nhdr')
 
     atlas_lin = np.zeros((6,height,width,depth))
     mask_acc = np.zeros((height,width,depth))
 
     for s in range(sample_num):
-        sio.savemat(f'{output_dir}/{file_name[s]}_phi_inv.mat', {'diffeo': phi_inv_acc_list[s]..cpu()detach().numpy()})
+        sio.savemat(f'{output_dir}/{file_name[s]}_phi_inv.mat', {'diffeo': phi_inv_acc_list[s].cpu().detach().numpy()})
         sio.savemat(f'{output_dir}/{file_name[s]}_phi.mat', {'diffeo': phi_acc_list[s].cpu().detach().numpy()})
         sio.savemat(f'{output_dir}/{file_name[s]}_energy.mat', {'energy': energy_list[s]})
         
         plt.plot(energy_list[s])
-        mask_acc += mask_list[s].numpy()
+        mask_acc += mask_list[s].cpu().numpy()
 
     atlas = torch.inverse(atlas)
     atlas_lin[0] = atlas[:,:,:,0,0].cpu()
@@ -267,4 +385,4 @@ if __name__ == "__main__":
     atlas_lin[5] = atlas[:,:,:,2,2].cpu()
     mask_acc[mask_acc>0]=1
     sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_lin,(3,2,1,0))), f'{output_dir}/atlas_tens.nhdr')
-    sitk.WriteImage(sitk.GetImageFromArray(np.transpose(mask_union,(2,1,0))), f'{output_dir}/atlas_mask.nhdr')
+    sitk.WriteImage(sitk.GetImageFromArray(np.transpose(mask_union.cpu(),(2,1,0))), f'{output_dir}/atlas_mask.nhdr')

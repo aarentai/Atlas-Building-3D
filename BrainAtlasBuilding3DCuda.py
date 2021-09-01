@@ -4,14 +4,15 @@ import numpy as np
 import scipy.io as sio
 import matplotlib.pyplot as plt
 import SimpleITK as sitk
+import os
 from lazy_imports import itkwidgets
 from lazy_imports import itkview
 from lazy_imports import interactive
 from lazy_imports import ipywidgets
 from lazy_imports import pv
 
-from mtch.RegistrationFunc3D import *
-from mtch.SplitEbinMetric3D import *
+from mtch.RegistrationFunc3DCuda import *
+from mtch.SplitEbinMetric3DCuda import *
 from mtch.GeoPlot import *
 
 # from Packages.disp.vis import show_2d, show_2d_tensors
@@ -92,7 +93,7 @@ def laplace_inverse(u):
     vy = torch.from_numpy(np.real(np.fft.ifftn(fy)))
     vz = torch.from_numpy(np.real(np.fft.ifftn(fz)))
 
-    return torch.stack((vx, vy, vz))#.to(device=torch.device('cuda'))
+    return torch.stack((vx, vy, vz)).to(device=torch.device('cuda'))
 
         
 def metric_matching(gi, gm, height, width, depth, mask, iter_num, epsilon, sigma, dim):
@@ -149,14 +150,20 @@ def fractional_anisotropy(g):
 
 
 if __name__ == "__main__":
-    torch.set_default_tensor_type('torch.DoubleTensor')
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # after switch device, you need restart the script
+    torch.cuda.set_device(0)
+    torch.set_default_tensor_type('torch.cuda.DoubleTensor')
+
     file_name = [105923,103818,111312]
     input_dir = '/usr/sci/projects/HCP/Kris/NSFCRCNS/TestResults/working_3d_python'
-    output_dir = 'output/Brain3AtlasMay24'
+    output_dir = 'output/Brain3AtlasAug7test'
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
     height, width, depth = 145,174,145
     sample_num = len(file_name)
     tensor_lin_list, tensor_met_list, mask_list, mask_thresh_list, fa_list = [], [], [], [], []
-    mask_union = torch.zeros(height, width, depth).double()
+    mask_union = torch.zeros(height, width, depth).double().to(device)
     phi_inv_acc_list, phi_acc_list, energy_list = [], [], []
     resume = False
    
@@ -168,7 +175,7 @@ if __name__ == "__main__":
         mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}/filt_mask.nhdr'))
         tensor_lin_list.append(torch.from_numpy(tensor_np).double().permute(3,2,1,0))
     #     create union of masks
-        mask_union += torch.from_numpy(mask_np).double().permute(2,1,0)
+        mask_union += torch.from_numpy(mask_np).double().permute(2,1,0).to(device)
         mask_list.append(torch.from_numpy(mask_np).double().permute(2,1,0))
     #     rearrange tensor_lin to tensor_met
         tensor_met_zeros = torch.zeros(height,width,depth,3,3,dtype=torch.float64)
@@ -203,7 +210,7 @@ if __name__ == "__main__":
         
     mask_union[mask_union>0] = 1
 
-
+    print(f'file_name = {file_name}, iter_num = {iter_num}, epsilon = 5e-3')
     print(f'Starting from iteration {start_iter} to iteration {iter_num+start_iter}')
 
     for i in tqdm(range(start_iter, start_iter+iter_num)):
@@ -231,40 +238,40 @@ if __name__ == "__main__":
             atlas_lin = np.zeros((6,height,width,depth))
             mask_acc = np.zeros((height,width,depth))
             atlas_inv = torch.inverse(atlas)
-            atlas_lin[0] = atlas_inv[:,:,:,0,0]
-            atlas_lin[1] = atlas_inv[:,:,:,0,1]
-            atlas_lin[2] = atlas_inv[:,:,:,0,2]
-            atlas_lin[3] = atlas_inv[:,:,:,1,1]
-            atlas_lin[4] = atlas_inv[:,:,:,1,2]
-            atlas_lin[5] = atlas_inv[:,:,:,2,2]
+            atlas_lin[0] = atlas_inv[:,:,:,0,0].cpu()
+            atlas_lin[1] = atlas_inv[:,:,:,0,1].cpu()
+            atlas_lin[2] = atlas_inv[:,:,:,0,2].cpu()
+            atlas_lin[3] = atlas_inv[:,:,:,1,1].cpu()
+            atlas_lin[4] = atlas_inv[:,:,:,1,2].cpu()
+            atlas_lin[5] = atlas_inv[:,:,:,2,2].cpu()
             for s in range(sample_num):
-                sio.savemat(f'{output_dir}/{file_name[s]}_{i}_phi_inv.mat', {'diffeo': phi_inv_acc_list[s].detach().numpy()})
-                sio.savemat(f'{output_dir}/{file_name[s]}_{i}_phi.mat', {'diffeo': phi_acc_list[s].detach().numpy()})
+                sio.savemat(f'{output_dir}/{file_name[s]}_{i}_phi_inv.mat', {'diffeo': phi_inv_acc_list[s].cpu().detach().numpy()})
+                sio.savemat(f'{output_dir}/{file_name[s]}_{i}_phi.mat', {'diffeo': phi_acc_list[s].cpu().detach().numpy()})
                 sio.savemat(f'{output_dir}/{file_name[s]}_{i}_energy.mat', {'energy': energy_list[s]})
     #             plt.plot(energy_list[s])
-                mask_acc += mask_list[s].numpy()
+                mask_acc += mask_list[s].cpu().numpy()
             mask_acc[mask_acc>0]=1
             sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_lin,(3,2,1,0))), f'{output_dir}/atlas_{i}_tens.nhdr')
-            sitk.WriteImage(sitk.GetImageFromArray(np.transpose(mask_union,(2,1,0))), f'{output_dir}/atlas_{i}_mask.nhdr')
+            sitk.WriteImage(sitk.GetImageFromArray(np.transpose(mask_union.cpu(),(2,1,0))), f'{output_dir}/atlas_{i}_mask.nhdr')
 
     atlas_lin = np.zeros((6,height,width,depth))
     mask_acc = np.zeros((height,width,depth))
 
     for s in range(sample_num):
-        sio.savemat(f'{output_dir}/{file_name[s]}_phi_inv.mat', {'diffeo': phi_inv_acc_list[s].detach().numpy()})
-        sio.savemat(f'{output_dir}/{file_name[s]}_phi.mat', {'diffeo': phi_acc_list[s].detach().numpy()})
+        sio.savemat(f'{output_dir}/{file_name[s]}_phi_inv.mat', {'diffeo': phi_inv_acc_list[s].cpu().detach().numpy()})
+        sio.savemat(f'{output_dir}/{file_name[s]}_phi.mat', {'diffeo': phi_acc_list[s].cpu().detach().numpy()})
         sio.savemat(f'{output_dir}/{file_name[s]}_energy.mat', {'energy': energy_list[s]})
         
         plt.plot(energy_list[s])
-        mask_acc += mask_list[s].numpy()
+        mask_acc += mask_list[s].cpu().numpy()
 
     atlas = torch.inverse(atlas)
-    atlas_lin[0] = atlas[:,:,:,0,0]
-    atlas_lin[1] = atlas[:,:,:,0,1]
-    atlas_lin[2] = atlas[:,:,:,0,2]
-    atlas_lin[3] = atlas[:,:,:,1,1]
-    atlas_lin[4] = atlas[:,:,:,1,2]
-    atlas_lin[5] = atlas[:,:,:,2,2]
+    atlas_lin[0] = atlas[:,:,:,0,0].cpu()
+    atlas_lin[1] = atlas[:,:,:,0,1].cpu()
+    atlas_lin[2] = atlas[:,:,:,0,2].cpu()
+    atlas_lin[3] = atlas[:,:,:,1,1].cpu()
+    atlas_lin[4] = atlas[:,:,:,1,2].cpu()
+    atlas_lin[5] = atlas[:,:,:,2,2].cpu()
     mask_acc[mask_acc>0]=1
     sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_lin,(3,2,1,0))), f'{output_dir}/atlas_tens.nhdr')
-    sitk.WriteImage(sitk.GetImageFromArray(np.transpose(mask_union,(2,1,0))), f'{output_dir}/atlas_mask.nhdr')
+    sitk.WriteImage(sitk.GetImageFromArray(np.transpose(mask_union.cpu(),(2,1,0))), f'{output_dir}/atlas_mask.nhdr')

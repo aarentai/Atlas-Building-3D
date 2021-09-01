@@ -27,7 +27,7 @@ def Squared_distance_Ebin(g0, g1, a, mask):
 #     3.3.4 https://www.cs.utah.edu/~haocheng/notes/NoteonMatching.pdf
     inv_g0_g1 = torch.einsum("...ik,...kj->...ij", torch.inverse(g0), g1)
     trK0square = trKsquare(g0, g1) - torch.log(torch.det(inv_g0_g1)) ** 2 *a  # torch.log(torch.det(inv_g0_g1) + 1e-25)
-    theta = torch.min((trK0square / a + 1e-40).sqrt() / 4., torch.tensor(np.pi, dtype=torch.double))  
+    theta = torch.min((trK0square / a + 1e-7).sqrt() / 4., torch.tensor(np.pi, dtype=torch.double))  # change 1e-40 to 1e-13, because there is only one negative error of 1e-15 in UKF brain experiment 
     alpha, beta = torch.det(g0).pow(1. / 4.), torch.det(g1).pow(1. / 4.)
     E = 16 * a * (alpha ** 2 - 2 * alpha * beta * torch.cos(theta) + beta ** 2)
     return torch.einsum("hwd,hwd->", E, mask)
