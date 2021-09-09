@@ -42,7 +42,7 @@ def phi_pullback(phi, g):
     return torch.einsum("ij...,ik...,kl...->...jl", d_phi, g_phi, d_phi)
 
 
-def energy_ebin(phi, g0, g1, f0, f1, i0, i1, sigma, dim, mask, brain_mask): 
+def energy_ebin(phi, g0, g1, f0, f1, i0, i1, sigma, dim, mask): 
 #     input: phi.shape = [3, h, w, d]; g0/g1/f0/f1.shape = [h, w, d, 3, 3]; sigma/dim = scalar; mask.shape = [1, h, w, d]
 #     output: scalar
 # the phi here is identity
@@ -50,12 +50,12 @@ def energy_ebin(phi, g0, g1, f0, f1, i0, i1, sigma, dim, mask, brain_mask):
     phi_star_f1 = phi_pullback(phi, f1)# the compose operation in this step uses a couple of thousands MB of memory
     phi_star_i1 = compose_function(i1.unsqueeze(0), phi).squeeze()# the compose operation in this step uses a couple of thousands MB of memory
     E1 = sigma * Squared_distance_Ebin(f0, phi_star_f1, 1./dim, mask)
-    # E2 = Squared_distance_Ebin(g0, phi_star_g1, 1./dim, mask)
-    E2 = Squared_distance_Ebin(g0, phi_star_g1, 1./dim, mask*brain_mask)
+    E2 = Squared_distance_Ebin(g0, phi_star_g1, 1./dim, mask)
     # E3 = torch.einsum("ijk,ijk->", (i0 - phi_star_i1) ** 2, mask)
-    E3 = torch.einsum("ijk,ijk->", (i0 - phi_star_i1) ** 2, (1-mask)*brain_mask)
-    print(E2*1e0, E3*3e-8)
-    return E1 + E2*1e0 + E3*3e-8
+    # E3 = torch.einsum("ijk,ijk->", (i0 - phi_star_i1) ** 2, (1-mask)*brain_mask)
+    E3 = torch.sum((i0 - phi_star_i1) ** 2)
+    print(E2*1e0, E3*1.5e-9)
+    return E1 + E2*1e0 + E3*1.5e-9
 
 
 def energy_L2(phi, g0, g1, f0, f1, sigma, mask): 
@@ -101,7 +101,7 @@ def laplace_inverse(u):
     return torch.stack((vx, vy, vz)).to(device=torch.device('cuda'))
 
         
-def metric_matching(gi, gm, ii, im, height, width, depth, mask, brain_mask, iter_num, epsilon, sigma, dim):
+def metric_matching(gi, gm, ii, im, height, width, depth, mask, iter_num, epsilon, sigma, dim):
     phi_inv = get_idty(height, width, depth)
     phi = get_idty(height, width, depth)
     idty = get_idty(height, width, depth)
@@ -113,7 +113,7 @@ def metric_matching(gi, gm, ii, im, height, width, depth, mask, brain_mask, iter
         phi_actsg0 = phi_pullback(phi_inv, gi)
         phi_actsf0 = phi_pullback(phi_inv, f0)
         phi_actsi0 = compose_function(ii.unsqueeze(0), phi_inv).squeeze()
-        E = energy_ebin(idty, phi_actsg0, gm, phi_actsf0, f1, phi_actsi0, im, sigma, dim, mask, brain_mask) 
+        E = energy_ebin(idty, phi_actsg0, gm, phi_actsf0, f1, phi_actsi0, im, sigma, dim, mask) 
         print(E.item())
         if torch.isnan(E):
             raise ValueError('NaN error')
@@ -265,14 +265,14 @@ if __name__ == "__main__":
     # file_name = []
     file_name = [108222, 102715, 105923, 107422, 100206, 104416]
     input_dir = '/usr/sci/projects/HCP/Kris/NSFCRCNS/TestResults/UKF_experiments/BallResults'
-    output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasUkfBallMetDominatedBrainMaskAug31'
+    output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasUkfBallMetDominatedBrainMaskSept3'
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
     height, width, depth = 145,174,145
     sample_num = len(file_name)
     tensor_lin_list, tensor_met_list, mask_list, mask_thresh_list, fa_list, img_list, brain_mask_list = [], [], [], [], [], [], []
     mask_union = torch.zeros(height, width, depth).double().to(device)
-    brain_mask_union = torch.zeros(height, width, depth).double().to(device)
+    # brain_mask_union = torch.zeros(height, width, depth).double().to(device)
     phi_inv_acc_list, phi_acc_list, energy_list = [], [], []
     resume = False
    
@@ -341,7 +341,7 @@ if __name__ == "__main__":
         for s in range(sample_num):
             energy_list[s].append(torch.einsum("ijk...,lijk->",[(tensor_met_list[s] - atlas)**2, mask_union.unsqueeze(0)]).item())
             old = tensor_met_list[s]
-            tensor_met_list[s], img_list[s], phi, phi_inv = metric_matching(tensor_met_list[s], atlas, img_list[s], mean_img, height, width, depth, mask_union, brain_mask_union, iter_num, epsilon, sigma, dim)
+            tensor_met_list[s], img_list[s], phi, phi_inv = metric_matching(tensor_met_list[s], atlas, img_list[s], mean_img, height, width, depth, mask_union, iter_num, epsilon, sigma, dim)
             phi_inv_list.append(phi_inv)
             phi_list.append(phi)
             phi_inv_acc_list[s] = compose_function(phi_inv_acc_list[s], phi_inv_list[s])
