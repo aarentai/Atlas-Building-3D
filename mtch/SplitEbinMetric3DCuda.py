@@ -7,6 +7,7 @@ from IPython.core.debugger import set_trace
 from math import pi
 from torchvectorized import vlinalg as tv
 from torch_sym3eig import Sym3Eig as se
+import pdb
 '''
 SplitEbinMetric.py stays the same from Atlas2D to Atlas3D
 '''
@@ -33,15 +34,25 @@ def Squared_distance_Ebin(g0, g1, a, mask):
     return torch.einsum("hwd,hwd->", E, mask)
 
 
+def tensor_cleaning(g, det_threshold=1e-11):
+    g[torch.det(g)<=det_threshold] = torch.eye((3))
+    g[torch.transpose(g,-1,-2)!=g] = torch.eye((3))
+    # Sylvester's criterion https://en.wikipedia.org/wiki/Sylvester%27s_criterion
+    psd_map = torch.where(g[...,0,0]>0, 1, 0) + torch.where(torch.det(g[...,:2,:2])>0, 1, 0) + torch.where(torch.det(g)>0, 1, 0)
+    nonpsd_idx = torch.where(psd_map!=3)
+    # nonpsd_idx = torch.where(torch.isnan(torch.sum(batch_cholesky(g), (3,4))))
+    for i in range(len(nonpsd_idx[0])):
+        g[nonpsd_idx[0][i], nonpsd_idx[1][i], nonpsd_idx[2][i]] = torch.eye((3))
+    return g
+
+
 def logm_invB_A(B, A):
-    import SimpleITK as sitk
 #     inputs: A/B.shape = [hxwxd, 3, 3]
 #     output: shape = [hxwxd, 3, 3]
     G = torch.linalg.cholesky(B)
     inv_G = torch.inverse(G)
     W = torch.einsum("...ij,...jk,...lk->...il", inv_G, A, inv_G)
     lamda, Q = se.apply(W)
-    log_lamda = torch.zeros((*lamda.shape, lamda.shape[-1]),dtype=torch.double)
     log_lamda = torch.diag_embed(torch.log(lamda))
     V = torch.einsum('...ji,...jk->...ik', inv_G, Q)
     inv_V = torch.inverse(V)
@@ -261,13 +272,23 @@ def ptPick_notInRange(g0, g1, i):  # (-1,3,3)
     return gm
 
 
+def tensor_cleaning(g, det_threshold=1e-15):
+    g[torch.det(g)<=det_threshold] = torch.eye((3))
+    # # Sylvester's criterion https://en.wikipedia.org/wiki/Sylvester%27s_criterion
+    # psd_map = torch.where(g[...,0,0]>0, 1, 0) + torch.where(torch.det(g[...,:2,:2])>0, 1, 0) + torch.where(torch.det(g)>0, 1, 0)
+    # nonpsd_idx = torch.where(psd_map!=3)
+    # # nonpsd_idx = torch.where(torch.isnan(torch.sum(batch_cholesky(g), (3,4))))
+    # for i in range(len(nonpsd_idx[0])):
+    #     g[nonpsd_idx[0][i], nonpsd_idx[1][i], nonpsd_idx[2][i]] = torch.eye((3))
+    # torch.where()
+    return g
+
 
 def get_karcher_mean(G, a):
     size = G.size()
     G = G.reshape(size[0], -1, *size[-2:])  # (T,-1,3,3)
     gm = G[0]
     for i in range(1, G.size(0)):
-#         print('logm_invB_A')
         U = logm_invB_A(gm, G[i])
         UTrless = U - torch.einsum("...ii,kl->...kl", U, torch.eye(size[-1], dtype=torch.double)) / size[
             -1]  # (...,2,2)

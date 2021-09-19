@@ -11,7 +11,7 @@ SplitEbinMetric.py stays the same from Atlas2D to Atlas3D
 '''
 
 def trKsquare(B, A):
-    G = torch.cholesky(B)
+    G = torch.linalg.cholesky(B)
     inv_G = torch.inverse(G)
     W = torch.einsum("...ij,...jk,...lk->...il", inv_G, A, inv_G)
     lamda = torch.symeig(W, eigenvectors=True)[0]
@@ -34,13 +34,13 @@ def Squared_distance_Ebin(g0, g1, a, mask):
 def logm_invB_A(B, A):
 #     inputs: A/B.shape = [h, w, d, 3, 3]
 #     output: shape = [h, w, d, 3, 3]
-    G = torch.cholesky(B)
-#     torch.linalg.cholesky(A)
+    G = torch.linalg.cholesky(B)
     inv_G = torch.inverse(G)
     W = torch.einsum("...ij,...jk,...lk->...il", inv_G, A, inv_G)
-#     set_trace()
-    lamda, Q = torch.symeig(W, eigenvectors=True)
-    log_lamda = torch.zeros((*lamda.shape, lamda.shape[-1]),dtype=torch.double)
+    # lamda, Q = torch.symeig(W, eigenvectors=True)
+    lamda, Q = torch.linalg.eig(W)#, eigenvectors=True
+    lamda, Q = lamda.real, Q.real
+    # log_lamda = torch.zeros((*lamda.shape, lamda.shape[-1]),dtype=torch.double)
     # for i in range(lamda.shape[-1]):
     #     log_lamda[:, i, i] = torch.log(lamda[:, i])
     log_lamda = torch.diag_embed(torch.log(lamda))

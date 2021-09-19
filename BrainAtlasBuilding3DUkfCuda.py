@@ -129,12 +129,19 @@ def metric_matching(gi, gm, height, width, depth, mask, iter_num, epsilon, sigma
             phi_inv = compose_function(phi_inv, psi_inv)
             idty.grad.data.zero_()
             
-    gi = phi_pullback(phi_inv, gi)
-    return gi, phi, phi_inv
+    # gi = phi_pullback(phi_inv, gi)
+    return phi, phi_inv#gi, 
 
 
 def tensor_cleaning(g, det_threshold=1e-11):
     g[torch.det(g)<=det_threshold] = torch.eye((3))
+    # g[torch.abs(torch.det(g)-1)<=1e-4] = torch.eye((3))
+    # almst_eye_map = torch.where(torch.abs(g[...,0,1])<1e-3, 1, 0) + torch.where(torch.abs(g[...,0,2])<1e-3, 1, 0) + torch.where(torch.abs(g[...,1,2])<1e-3, 1, 0) +\
+    #         torch.where(torch.abs(g[...,0,0]-1)<1e-3, 1, 0) + torch.where(torch.abs(g[...,1,1]-1)<1e-3, 1, 0) + torch.where(torch.abs(g[...,2,2]-1)<1e-3, 1, 0)
+    # almst_eye_idx = torch.where(almst_eye_map==6)
+    # alms_eye_idx = torch.where(torch.det(g)==1 and torch.abs(g[...,0,1])<1e-5 and torch.abs(g[...,0,2])<1e-5 and torch.abs(g[...,1,2])<1e-5)
+    # for i in range(len(almst_eye_idx[0])):
+    #     g[almst_eye_idx[0][i], almst_eye_idx[1][i], almst_eye_idx[2][i]] = torch.eye((3))
     # Sylvester's criterion https://en.wikipedia.org/wiki/Sylvester%27s_criterion
     psd_map = torch.where(g[...,0,0]>0, 1, 0) + torch.where(torch.det(g[...,:2,:2])>0, 1, 0) + torch.where(torch.det(g)>0, 1, 0)
     nonpsd_idx = torch.where(psd_map!=3)
@@ -245,19 +252,20 @@ def make_pos_def(tens, mask, small_eval = 0.00005):
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # after switch device, you need restart the script
-    torch.cuda.set_device('cuda:0')
+    torch.cuda.set_device('cuda:1')
     torch.set_default_tensor_type('torch.cuda.DoubleTensor')
 
     # file_name = []
-    file_name = [108222, 102715, 105923, 107422, 100206, 104416]
+    file_name = [108222, 102715, 105923, 107422, 100206, 104416]#
     input_dir = '/usr/sci/projects/HCP/Kris/NSFCRCNS/TestResults/UKF_experiments/BallResults'
-    output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasUkfBallAug27Unsmoothed'
+    output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasUkfBallMetSept11'
     # output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasUkfBallAug27ScaledOrig'
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
     height, width, depth = 145,174,145
     sample_num = len(file_name)
     tensor_lin_list, tensor_met_list, mask_list, mask_thresh_list, fa_list, img_list = [], [], [], [], [], []
+    tensor_met_orig_list, mask_orig_list = [], []
     mask_union = torch.zeros(height, width, depth).double().to(device)
     phi_inv_acc_list, phi_acc_list, energy_list = [], [], []
     resume = False
@@ -267,8 +275,8 @@ if __name__ == "__main__":
 
     for s in range(len(file_name)):
         # print(f'{s} is processing.')
-        tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_scaled_unsmoothed_tensors.nhdr'))
-        mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_filt_mask.nhdr'))
+        tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_scaled_unsmoothed_tensors_rreg.nhdr'))#
+        mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_filt_mask_rreg.nhdr'))#
         # tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_scaled_orig_tensors.nhdr'))
         # mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_orig_mask.nhdr'))
         # img_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_T1_flip_y.nhdr'))
@@ -276,6 +284,7 @@ if __name__ == "__main__":
     #     create union of masks
         mask_union += torch.from_numpy(mask_np).double().permute(2,1,0).to(device)
         mask_list.append(torch.from_numpy(mask_np).double().permute(2,1,0))
+        mask_orig_list.append(torch.from_numpy(mask_np).double().permute(2,1,0))
         # img_list.append(torch.from_numpy(img_np).double().permute(2,1,0))
     #     rearrange tensor_lin to tensor_met
         tensor_met_zeros = torch.zeros(height,width,depth,3,3,dtype=torch.float64)
@@ -290,17 +299,19 @@ if __name__ == "__main__":
         tensor_met_zeros[:,:,:,2,2] = tensor_lin_list[s][5]
         # tensor_met_zeros = make_pos_def(tensor_met_zeros, torch.ones((height, width, depth)))
     #     balance the background and subject by rescaling
-        tensor_met_zeros = tensor_cleaning(tensor_met_zeros)#, scale_factor=torch.tensor(1,dtype=torch.float64)
+        tensor_met_zeros = tensor_cleaning(tensor_met_zeros)
         # fa_list.append(fractional_anisotropy(tensor_met_zeros))
         tensor_met_list.append(torch.inverse(tensor_met_zeros))
-        tensor_met_list[s][:,:,:,0,1] = tensor_met_list[s][:,:,:,1,0]
-        tensor_met_list[s][:,:,:,0,2] = tensor_met_list[s][:,:,:,2,0]
-        tensor_met_list[s][:,:,:,1,2] = tensor_met_list[s][:,:,:,2,1]
+        tensor_met_orig_list.append(torch.inverse(tensor_met_zeros))
+        # tensor_met_list[s][:,:,:,0,1] = tensor_met_list[s][:,:,:,1,0]
+        # tensor_met_list[s][:,:,:,0,2] = tensor_met_list[s][:,:,:,2,0]
+        # tensor_met_list[s][:,:,:,1,2] = tensor_met_list[s][:,:,:,2,1]
         # fore_back_adaptor = torch.ones((height,width,depth))
         # fore_back_adaptor = torch.where(torch.det(tensor_met_list[s])>1e1, 5e-4, 1.)
         fore_back_adaptor = torch.where(torch.det(tensor_met_list[s])>1e2, 1e-3, 1.)#
         mask_thresh_list.append(fore_back_adaptor)
         tensor_met_list[s] = torch.einsum('ijk...,lijk->ijk...', tensor_met_list[s], mask_thresh_list[s].unsqueeze(0))
+        tensor_met_orig_list[s] = torch.einsum('ijk...,lijk->ijk...', tensor_met_orig_list[s], mask_thresh_list[s].unsqueeze(0))
     #     initialize the accumulative diffeomorphism    
         if resume==False:
             print('start from identity')
@@ -313,32 +324,40 @@ if __name__ == "__main__":
             tensor_met_list[s] = phi_pullback(phi_inv_acc_list[s], tensor_met_list[s])
         energy_list.append([])    
         
-    mask_union[mask_union>0] = 1
+    # mask_union[mask_union>0] = 1
 
     print(f'file_name = {file_name}, iter_num = {iter_num}, epsilon = 5e-3')
     print(f'Starting from iteration {start_iter} to iteration {iter_num+start_iter}')
 
     for i in tqdm(range(start_iter, start_iter+iter_num)):
         G = torch.stack(tuple(tensor_met_list))
-        # for i in range(G.shape[0]):
-        #     G[i] = tensor_cleaning(G[i])
-        #     print(f'{i} cleaned')
+        # G[torch.abs(torch.det(G)-1)<=2e-3] = torch.eye((3))
+        if i==0:
+            almst_eye_map = torch.where(torch.abs(G[...,0,1])<1e-4, 1., 0.) + torch.where(torch.abs(G[...,0,2])<1e-4, 1., 0.) + torch.where(torch.abs(G[...,1,2])<1e-4, 1., 0.) +\
+                            torch.where(torch.abs(G[...,0,0]-1)<1e-4, 1., 0.) + torch.where(torch.abs(G[...,1,1]-1)<1e-4, 1., 0.) + torch.where(torch.abs(G[...,2,2]-1)<1e-4, 1., 0.)+\
+                            torch.where(torch.abs(G[...,0,1])!=0, 1., 0.) + torch.where(torch.abs(G[...,0,2])!=0, 1., 0.) + torch.where(torch.abs(G[...,1,2])!=0, 1., 0.) +\
+                            torch.where(torch.abs(G[...,0,0]-1)!=0, 1., 0.) + torch.where(torch.abs(G[...,1,1]-1)!=0, 1., 0.) + torch.where(torch.abs(G[...,2,2]-1)!=0, 1., 0.)
+            almst_eye_idx = torch.where(almst_eye_map==12)
+            print(len(almst_eye_idx[0]))
+            for j in range(len(almst_eye_idx[0])):
+                G[almst_eye_idx[0][i], almst_eye_idx[1][i], almst_eye_idx[2][i], almst_eye_idx[3][i]] = torch.eye((3))
+
         dim, sigma, epsilon, iter_num = 3., 0, 5e-3, 1 # epsilon = 3e-3 for orig tensor
         atlas = get_karcher_mean(G, 1./dim)
-        # atlas = tensor_cleaning(atlas)
-        # mean_img = get_euclidean_mean(img_list)
 
         phi_inv_list, phi_list = [], []
+        mask_union = ((mask_list[0]+mask_list[1]+mask_list[2]+mask_list[3]+mask_list[4]+mask_list[5])/len(file_name)).to(device)#
         for s in range(sample_num):
             energy_list[s].append(torch.einsum("ijk...,lijk->",[(tensor_met_list[s] - atlas)**2, mask_union.unsqueeze(0)]).item())
-            old = tensor_met_list[s]
-            tensor_met_list[s], phi, phi_inv = metric_matching(tensor_met_list[s], atlas, height, width, depth, mask_union, iter_num, epsilon, sigma,dim)
+            # old = tensor_met_list[s]
+            phi, phi_inv = metric_matching(tensor_met_list[s], atlas, height, width, depth, mask_union, iter_num, epsilon, sigma,dim)#tensor_met_list[s], 
             # tensor_met_list[s] = tensor_cleaning(tensor_met_list[s])
             phi_inv_list.append(phi_inv)
             phi_list.append(phi)
             phi_inv_acc_list[s] = compose_function(phi_inv_acc_list[s], phi_inv_list[s])
             phi_acc_list[s] = compose_function(phi_list[s], phi_acc_list[s])
-            mask_list[s] = compose_function(mask_list[s], phi_inv_list[s])
+            mask_list[s] = compose_function(mask_orig_list[s], phi_inv_acc_list[s])
+            tensor_met_list[s] = phi_pullback(phi_inv_acc_list[s], tensor_met_orig_list[s])
     #         if i%1==0:
     #             plot_diffeo(phi_acc_list[s][1:, 50, :, :], step_size=2, show_axis=True)
     #             plot_diffeo(phi_acc_list[s][:2, :, :, 20], step_size=2, show_axis=True)
@@ -360,8 +379,8 @@ if __name__ == "__main__":
                 sio.savemat(f'{output_dir}/{file_name[s]}_{i}_phi.mat', {'diffeo': phi_acc_list[s].cpu().detach().numpy()})
                 sio.savemat(f'{output_dir}/{file_name[s]}_{i}_energy.mat', {'energy': energy_list[s]})
     #             plt.plot(energy_list[s])
-                mask_acc += mask_list[s].cpu().numpy()
-            mask_acc[mask_acc>0]=1
+            #     mask_acc += mask_list[s].cpu().numpy()
+            # mask_acc[mask_acc>0]=1
             sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_lin,(3,2,1,0))), f'{output_dir}/atlas_{i}_tens.nhdr')
             sitk.WriteImage(sitk.GetImageFromArray(np.transpose(mask_union.cpu(),(2,1,0))), f'{output_dir}/atlas_{i}_mask.nhdr')
 
@@ -374,7 +393,7 @@ if __name__ == "__main__":
         sio.savemat(f'{output_dir}/{file_name[s]}_energy.mat', {'energy': energy_list[s]})
         
         plt.plot(energy_list[s])
-        mask_acc += mask_list[s].cpu().numpy()
+        # mask_acc += mask_list[s].cpu().numpy()
 
     atlas = torch.inverse(atlas)
     atlas_lin[0] = atlas[:,:,:,0,0].cpu()
@@ -383,6 +402,6 @@ if __name__ == "__main__":
     atlas_lin[3] = atlas[:,:,:,1,1].cpu()
     atlas_lin[4] = atlas[:,:,:,1,2].cpu()
     atlas_lin[5] = atlas[:,:,:,2,2].cpu()
-    mask_acc[mask_acc>0]=1
+    # mask_acc[mask_acc>0]=1
     sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_lin,(3,2,1,0))), f'{output_dir}/atlas_tens.nhdr')
     sitk.WriteImage(sitk.GetImageFromArray(np.transpose(mask_union.cpu(),(2,1,0))), f'{output_dir}/atlas_mask.nhdr')

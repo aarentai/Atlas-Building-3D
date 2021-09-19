@@ -54,8 +54,8 @@ def energy_ebin(phi, g0, g1, f0, f1, i0, i1, sigma, dim, mask):
     # E3 = torch.einsum("ijk,ijk->", (i0 - phi_star_i1) ** 2, mask)
     # E3 = torch.einsum("ijk,ijk->", (i0 - phi_star_i1) ** 2, (1-mask)*brain_mask)
     E3 = torch.sum((i0 - phi_star_i1) ** 2)
-    print(E2*1e0, E3*1.5e-9)
-    return E1 + E2*1e0 + E3*1.5e-9
+    print(E2*2.5e2, E3*1.5e-9)
+    return E1 + E2*2.5e2 + E3*1.5e-9
 
 
 def energy_L2(phi, g0, g1, f0, f1, sigma, mask): 
@@ -139,7 +139,7 @@ def metric_matching(gi, gm, ii, im, height, width, depth, mask, iter_num, epsilo
     return gi, ii.squeeze(), phi, phi_inv
 
 
-def tensor_cleaning(g, det_threshold=1e-11):
+def tensor_cleaning(g, det_threshold=1e-8):
     g[torch.det(g)<=det_threshold] = torch.eye((3))
     # Sylvester's criterion https://en.wikipedia.org/wiki/Sylvester%27s_criterion
     psd_map = torch.where(g[...,0,0]>0, 1, 0) + torch.where(torch.det(g[...,:2,:2])>0, 1, 0) + torch.where(torch.det(g)>0, 1, 0)
@@ -265,7 +265,7 @@ if __name__ == "__main__":
     # file_name = []
     file_name = [108222, 102715, 105923, 107422, 100206, 104416]
     input_dir = '/usr/sci/projects/HCP/Kris/NSFCRCNS/TestResults/UKF_experiments/BallResults'
-    output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasUkfBallMetDominatedBrainMaskSept3'
+    output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasUkfBallImgMetRigidSept9'
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
     height, width, depth = 145,174,145
@@ -273,7 +273,7 @@ if __name__ == "__main__":
     tensor_lin_list, tensor_met_list, mask_list, mask_thresh_list, fa_list, img_list, brain_mask_list = [], [], [], [], [], [], []
     mask_union = torch.zeros(height, width, depth).double().to(device)
     # brain_mask_union = torch.zeros(height, width, depth).double().to(device)
-    phi_inv_acc_list, phi_acc_list, energy_list = [], [], []
+    phi_inv_acc_list, phi_acc_list, met_energy_list, img_energy_list = [], [], [], []
     resume = False
    
     start_iter = 0
@@ -285,11 +285,15 @@ if __name__ == "__main__":
         mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_filt_mask.nhdr'))
         brain_mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_brain_mask.nhdr'))
         img_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_T1_flip_y.nhdr'))
+        # tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_scaled_unsmoothed_tensors_rreg.nhdr'))
+        # mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_filt_mask_rreg.nhdr'))
+        # # brain_mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_brain_mask_rreg.nhdr'))
+        # img_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_t1_to_reft1_rreg.nhdr'))
         tensor_lin_list.append(torch.from_numpy(tensor_np).double().permute(3,2,1,0))
     #     create union of masks
         mask_union += torch.from_numpy(mask_np).double().permute(2,1,0).to(device)
         mask_list.append(torch.from_numpy(mask_np).double().permute(2,1,0))
-        brain_mask_list.append(torch.from_numpy(brain_mask_np).double().permute(2,1,0))
+        # brain_mask_list.append(torch.from_numpy(brain_mask_np).double().permute(2,1,0))
         img_list.append(torch.from_numpy(img_np).double().permute(2,1,0))
     #     rearrange tensor_lin to tensor_met
         tensor_met_zeros = torch.zeros(height,width,depth,3,3,dtype=torch.float64)
@@ -322,7 +326,8 @@ if __name__ == "__main__":
             phi_inv_acc_list.append(torch.from_numpy(sio.loadmat(f'{output_dir}/{file_name[s]}_{start_iter-1}_phi_inv.mat')['diffeo']))
             phi_acc_list.append(torch.from_numpy(sio.loadmat(f'{output_dir}/{file_name[s]}_{start_iter-1}_phi.mat')['diffeo']))
             tensor_met_list[s] = phi_pullback(phi_inv_acc_list[s], tensor_met_list[s])
-        energy_list.append([])    
+        met_energy_list.append([])    
+        img_energy_list.append([])    
         
     # mask_union[mask_union>0] = 1
 
@@ -337,9 +342,10 @@ if __name__ == "__main__":
 
         phi_inv_list, phi_list = [], []
         mask_union = ((mask_list[0]+mask_list[1]+mask_list[2]+mask_list[3]+mask_list[4]+mask_list[5])/6).to(device)
-        brain_mask_union = ((brain_mask_list[0]+brain_mask_list[1]+brain_mask_list[2]+brain_mask_list[3]+brain_mask_list[4]+brain_mask_list[5])/6).to(device)
+        # brain_mask_union = ((brain_mask_list[0]+brain_mask_list[1]+brain_mask_list[2]+brain_mask_list[3]+brain_mask_list[4]+brain_mask_list[5])/6).to(device)
         for s in range(sample_num):
-            energy_list[s].append(torch.einsum("ijk...,lijk->",[(tensor_met_list[s] - atlas)**2, mask_union.unsqueeze(0)]).item())
+            met_energy_list[s].append(torch.einsum("ijk...,lijk->",[(tensor_met_list[s] - atlas)**2, mask_union.unsqueeze(0)]).item())
+            img_energy_list[s].append(torch.sum((img_list[s] - mean_img)**2).item())
             old = tensor_met_list[s]
             tensor_met_list[s], img_list[s], phi, phi_inv = metric_matching(tensor_met_list[s], atlas, img_list[s], mean_img, height, width, depth, mask_union, iter_num, epsilon, sigma, dim)
             phi_inv_list.append(phi_inv)
@@ -347,14 +353,14 @@ if __name__ == "__main__":
             phi_inv_acc_list[s] = compose_function(phi_inv_acc_list[s], phi_inv_list[s])
             phi_acc_list[s] = compose_function(phi_list[s], phi_acc_list[s])
             mask_list[s] = compose_function(mask_list[s], phi_inv_list[s])
-            brain_mask_list[s] = compose_function(brain_mask_list[s], phi_inv_list[s])
+            # brain_mask_list[s] = compose_function(brain_mask_list[s], phi_inv_list[s])
     #         if i%1==0:
     #             plot_diffeo(phi_acc_list[s][1:, 50, :, :], step_size=2, show_axis=True)
     #             plot_diffeo(phi_acc_list[s][:2, :, :, 20], step_size=2, show_axis=True)
     #             plot_diffeo(torch.stack((phi_acc_list[s][0, :, 50, :],phi_acc_list[s][2, :, 50, :]),0), step_size=2, show_axis=True)
                 
         '''check point'''
-        if i%50==0:
+        if i%1==0:
             atlas_lin = np.zeros((6,height,width,depth))
             mask_acc = np.zeros((height,width,depth))
             atlas_inv = torch.inverse(atlas)
@@ -367,7 +373,8 @@ if __name__ == "__main__":
             for s in range(sample_num):
                 sio.savemat(f'{output_dir}/{file_name[s]}_{i}_phi_inv.mat', {'diffeo': phi_inv_acc_list[s].cpu().detach().numpy()})
                 sio.savemat(f'{output_dir}/{file_name[s]}_{i}_phi.mat', {'diffeo': phi_acc_list[s].cpu().detach().numpy()})
-                sio.savemat(f'{output_dir}/{file_name[s]}_{i}_energy.mat', {'energy': energy_list[s]})
+                sio.savemat(f'{output_dir}/{file_name[s]}_{i}_met_energy.mat', {'energy': met_energy_list[s]})
+                sio.savemat(f'{output_dir}/{file_name[s]}_{i}_img_energy.mat', {'energy': img_energy_list[s]})
     #             plt.plot(energy_list[s])
                 # mask_acc += mask_list[s].cpu().numpy()
             # mask_acc[mask_acc>0]=1
@@ -381,9 +388,11 @@ if __name__ == "__main__":
     for s in range(sample_num):
         sio.savemat(f'{output_dir}/{file_name[s]}_phi_inv.mat', {'diffeo': phi_inv_acc_list[s].cpu().detach().numpy()})
         sio.savemat(f'{output_dir}/{file_name[s]}_phi.mat', {'diffeo': phi_acc_list[s].cpu().detach().numpy()})
-        sio.savemat(f'{output_dir}/{file_name[s]}_energy.mat', {'energy': energy_list[s]})
+        sio.savemat(f'{output_dir}/{file_name[s]}_{i}_met_energy.mat', {'energy': met_energy_list[s]})
+        sio.savemat(f'{output_dir}/{file_name[s]}_{i}_img_energy.mat', {'energy': img_energy_list[s]})
         
-        plt.plot(energy_list[s])
+        plt.plot(met_energy_list[s])
+        plt.plot(img_energy_list[s])
         # mask_acc += mask_list[s].cpu().numpy()
 
     atlas = torch.inverse(atlas)
