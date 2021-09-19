@@ -58,6 +58,7 @@ cholesky_cpu: For batch 0: U(1,1) is zero, singular U.
 1. It's probably caused by a large epsilon, so the composed tensor field is no longer positive definite everywhere.
 2. For cholesky failure in `Squared_distance_Ebin`, it's resulted from `trK0square = trKsquare(g0, g1) - torch.log(torch.det(inv_g0_g1)) ** 2 *a` in `SplitEbinMetric3DCuda.py` gets negative value, may need to increase the constant in `theta`.
 3. For cholesky failure in `get_karchar_mean`, it's resulted from dirty data. When dealing with real brain data, making sure all the tensors are positive definite and have positive determinants are not enough, extremely small positive determinants are also not allowed, say 1e-19.
+4. For `sym3eig` package, there might be some problems when encounter the matrix that is similar but not exactly equals to identity matrix, we suggest using the `torch.linalg.eig()`.
 - `a` in `Squared_distance_Ebin(g0, g1, a, mask)`, `get_karcher_mean(G, a)`, `get_geo(g0, g1, a, Tpts)`, `inv_RieExp_extended(g0, g1, a)`, `Rie_Exp_extended(g0, u, a)`, `Rie_Exp(g0, u, a)`, `inv_RieExp(g0, g1, a)` equals to the reciprocal of dimension, `1/dim`, namely the last entry of tensor field's shape.
 
 - When an out of range error is raised, check if all the tensors get the right dimension order.

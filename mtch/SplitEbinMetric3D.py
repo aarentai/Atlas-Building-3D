@@ -37,12 +37,8 @@ def logm_invB_A(B, A):
     G = torch.linalg.cholesky(B)
     inv_G = torch.inverse(G)
     W = torch.einsum("...ij,...jk,...lk->...il", inv_G, A, inv_G)
-    # lamda, Q = torch.symeig(W, eigenvectors=True)
     lamda, Q = torch.linalg.eig(W)#, eigenvectors=True
     lamda, Q = lamda.real, Q.real
-    # log_lamda = torch.zeros((*lamda.shape, lamda.shape[-1]),dtype=torch.double)
-    # for i in range(lamda.shape[-1]):
-    #     log_lamda[:, i, i] = torch.log(lamda[:, i])
     log_lamda = torch.diag_embed(torch.log(lamda))
     V = torch.einsum('...ji,...jk->...ik', inv_G, Q)
     inv_V = torch.inverse(V)
