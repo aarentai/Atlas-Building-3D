@@ -5,6 +5,7 @@ import scipy.io as sio
 import matplotlib.pyplot as plt
 import SimpleITK as sitk
 import os
+import random
 from lazy_imports import itkwidgets
 from lazy_imports import itkview
 from lazy_imports import interactive
@@ -54,8 +55,9 @@ def energy_ebin(phi, g0, g1, f0, f1, i0, i1, sigma, dim, mask):
     # E3 = torch.einsum("ijk,ijk->", (i0 - phi_star_i1) ** 2, mask)
     # E3 = torch.einsum("ijk,ijk->", (i0 - phi_star_i1) ** 2, (1-mask)*brain_mask)
     E3 = torch.sum((i0 - phi_star_i1) ** 2)
-    print(E2*2.5e2, E3*1.5e-9)
-    return E1 + E2*2.5e2 + E3*1.5e-9
+    print(E2, E3*1.5e-8)
+    return E1 + E2 + E3*1.5e-8
+    # return E1 + E2
 
 
 def energy_L2(phi, g0, g1, f0, f1, sigma, mask): 
@@ -139,8 +141,17 @@ def metric_matching(gi, gm, ii, im, height, width, depth, mask, iter_num, epsilo
     return gi, ii.squeeze(), phi, phi_inv
 
 
-def tensor_cleaning(g, det_threshold=1e-8):
+def tensor_cleaning(g, det_threshold=1e-11):
     g[torch.det(g)<=det_threshold] = torch.eye((3))
+    
+    almst_eye_map = torch.where(torch.abs(g[...,0,1])<1e-4, 1., 0.) + torch.where(torch.abs(g[...,0,2])<1e-4, 1., 0.) + torch.where(torch.abs(g[...,1,2])<1e-4, 1., 0.) +\
+                            torch.where(torch.abs(g[...,0,0]-1)<1e-4, 1., 0.) + torch.where(torch.abs(g[...,1,1]-1)<1e-4, 1., 0.) + torch.where(torch.abs(g[...,2,2]-1)<1e-4, 1., 0.)+\
+                            torch.where(torch.abs(g[...,0,1])!=0, 1., 0.) + torch.where(torch.abs(g[...,0,2])!=0, 1., 0.) + torch.where(torch.abs(g[...,1,2])!=0, 1., 0.) +\
+                            torch.where(torch.abs(g[...,0,0]-1)!=0, 1., 0.) + torch.where(torch.abs(g[...,1,1]-1)!=0, 1., 0.) + torch.where(torch.abs(g[...,2,2]-1)!=0, 1., 0.)
+    almst_eye_idx = torch.where(almst_eye_map==12)
+    for j in range(len(almst_eye_idx[0])):
+        g[almst_eye_idx[0][j], almst_eye_idx[1][j], almst_eye_idx[2][j], almst_eye_idx[3][j]] = torch.eye((3))
+
     # Sylvester's criterion https://en.wikipedia.org/wiki/Sylvester%27s_criterion
     psd_map = torch.where(g[...,0,0]>0, 1, 0) + torch.where(torch.det(g[...,:2,:2])>0, 1, 0) + torch.where(torch.det(g)>0, 1, 0)
     nonpsd_idx = torch.where(psd_map!=3)
@@ -265,7 +276,7 @@ if __name__ == "__main__":
     # file_name = []
     file_name = [108222, 102715, 105923, 107422, 100206, 104416]
     input_dir = '/usr/sci/projects/HCP/Kris/NSFCRCNS/TestResults/UKF_experiments/BallResults'
-    output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasUkfBallImgMetRigidSept9'
+    output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasMetImg'
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
     height, width, depth = 145,174,145
@@ -281,14 +292,18 @@ if __name__ == "__main__":
 
     for s in range(len(file_name)):
         # print(f'{s} is processing.')
-        tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_scaled_unsmoothed_tensors.nhdr'))
-        mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_filt_mask.nhdr'))
-        brain_mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_brain_mask.nhdr'))
-        img_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_T1_flip_y.nhdr'))
+        # tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_scaled_unsmoothed_tensors.nhdr'))
+        # mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_filt_mask.nhdr'))
+        # brain_mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_brain_mask.nhdr'))
+        # img_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_T1_flip_y.nhdr'))
         # tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_scaled_unsmoothed_tensors_rreg.nhdr'))
         # mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_filt_mask_rreg.nhdr'))
         # # brain_mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_brain_mask_rreg.nhdr'))
         # img_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_t1_to_reft1_rreg.nhdr'))
+        tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_scaled_orig_tensors_rreg.nhdr'))
+        mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_orig_mask_rreg.nhdr'))
+        # img_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_T1_flip_y.nhdr'))
+        img_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_t1_to_reft1_rreg.nhdr'))
         tensor_lin_list.append(torch.from_numpy(tensor_np).double().permute(3,2,1,0))
     #     create union of masks
         mask_union += torch.from_numpy(mask_np).double().permute(2,1,0).to(device)
@@ -316,6 +331,7 @@ if __name__ == "__main__":
         fore_back_adaptor = torch.where(torch.det(tensor_met_list[s])>1e2, 1e-3, 1.)#
         mask_thresh_list.append(fore_back_adaptor)
         tensor_met_list[s] = torch.einsum('ijk...,lijk->ijk...', tensor_met_list[s], mask_thresh_list[s].unsqueeze(0))
+        # tensor_met_list[s][torch.abs(torch.det(tensor_met_list[s])-1)<=1e-3] = torch.eye((3))
     #     initialize the accumulative diffeomorphism    
         if resume==False:
             print('start from identity')
@@ -323,8 +339,8 @@ if __name__ == "__main__":
             phi_acc_list.append(get_idty(height, width, depth))
         else:
             print('start from checkpoint')
-            phi_inv_acc_list.append(torch.from_numpy(sio.loadmat(f'{output_dir}/{file_name[s]}_{start_iter-1}_phi_inv.mat')['diffeo']))
-            phi_acc_list.append(torch.from_numpy(sio.loadmat(f'{output_dir}/{file_name[s]}_{start_iter-1}_phi.mat')['diffeo']))
+            phi_inv_acc_list.append(torch.from_numpy(sio.loadmat(f'{output_dir}/{file_name[s]}_{start_iter-1}_phi_inv.mat')['diffeo']).to(device))
+            phi_acc_list.append(torch.from_numpy(sio.loadmat(f'{output_dir}/{file_name[s]}_{start_iter-1}_phi.mat')['diffeo']).to(device))
             tensor_met_list[s] = phi_pullback(phi_inv_acc_list[s], tensor_met_list[s])
         met_energy_list.append([])    
         img_energy_list.append([])    
@@ -336,8 +352,11 @@ if __name__ == "__main__":
 
     for i in tqdm(range(start_iter, start_iter+iter_num)):
         G = torch.stack(tuple(tensor_met_list))
+        G[torch.abs(torch.det(G)-1)<=8e-3] = torch.eye((3))
+        G = tensor_cleaning(G, det_threshold=1e-11)
+
         dim, sigma, epsilon, iter_num = 3., 0, 5e-3, 1 # epsilon = 3e-3 for orig tensor
-        atlas = get_karcher_mean(G, 1./dim)
+        atlas = get_karcher_mean(G, 1./dim)#_shuffle
         mean_img = get_euclidean_mean(img_list)
 
         phi_inv_list, phi_list = [], []
@@ -348,19 +367,15 @@ if __name__ == "__main__":
             img_energy_list[s].append(torch.sum((img_list[s] - mean_img)**2).item())
             old = tensor_met_list[s]
             tensor_met_list[s], img_list[s], phi, phi_inv = metric_matching(tensor_met_list[s], atlas, img_list[s], mean_img, height, width, depth, mask_union, iter_num, epsilon, sigma, dim)
+            # tensor_met_list[s][torch.abs(torch.det(tensor_met_list[s])-1)<=1e-3] = torch.eye((3))
             phi_inv_list.append(phi_inv)
             phi_list.append(phi)
             phi_inv_acc_list[s] = compose_function(phi_inv_acc_list[s], phi_inv_list[s])
             phi_acc_list[s] = compose_function(phi_list[s], phi_acc_list[s])
             mask_list[s] = compose_function(mask_list[s], phi_inv_list[s])
-            # brain_mask_list[s] = compose_function(brain_mask_list[s], phi_inv_list[s])
-    #         if i%1==0:
-    #             plot_diffeo(phi_acc_list[s][1:, 50, :, :], step_size=2, show_axis=True)
-    #             plot_diffeo(phi_acc_list[s][:2, :, :, 20], step_size=2, show_axis=True)
-    #             plot_diffeo(torch.stack((phi_acc_list[s][0, :, 50, :],phi_acc_list[s][2, :, 50, :]),0), step_size=2, show_axis=True)
                 
         '''check point'''
-        if i%1==0:
+        if i%50==0:
             atlas_lin = np.zeros((6,height,width,depth))
             mask_acc = np.zeros((height,width,depth))
             atlas_inv = torch.inverse(atlas)

@@ -150,7 +150,9 @@ if __name__ == "__main__":
     # torch.set_default_tensor_type('torch.DoubleTensor')
     file_name = [108222, 102715, 105923, 107422, 100206, 104416]
     input_dir = '/usr/sci/projects/HCP/Kris/NSFCRCNS/TestResults/UKF_experiments/BallResults'
-    output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasUkfBallImgMetDirectRegSept10'
+    output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasMetImg'
+    # output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasShuffleMetImg'
+    # output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasUkfBallImgMetDirectRegSept10'
     # output_dir = '/home/sci/hdai/Projects/Atlas3D/output/BrainAtlasUkfBallMetSept11'
     # if not os.path.isdir(output_dir):
     #     os.mkdir(output_dir)
@@ -174,7 +176,7 @@ if __name__ == "__main__":
         # for s in range(1):
     #     read tensor and mask files
         print(s)
-        tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_scaled_orig_tensors_rreg_v2.nhdr'))
+        tensor_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_scaled_orig_tensors_rreg.nhdr'))
         mask_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_orig_mask_rreg.nhdr'))
         img_np = sitk.GetArrayFromImage(sitk.ReadImage(f'{input_dir}/{file_name[s]}_t1_to_reft1_rreg.nhdr'))
         
@@ -206,19 +208,12 @@ if __name__ == "__main__":
     for s in range(len(file_name)):
             
         tensor_met_list[s] = phi_pullback(diffeo_list[s], tensor_met_list[s])
-    #     tensor_met_list[s] = tensor_cleaning(tensor_met_list[s])
+        tensor_met_list[s] = tensor_cleaning(tensor_met_list[s])
         atlas_mask += compose_function(mask_list[s].unsqueeze(0), diffeo_list[s]).squeeze()
     #     atlas_brain_mask += compose_function(brain_mask_list[s].unsqueeze(0), diffeo_list[s]).squeeze()
         atlas_img += compose_function(img_list[s].unsqueeze(0), diffeo_list[s]).squeeze()
 
     G = torch.stack(tuple(tensor_met_list))
-#     G[0,64,83,100] = torch.eye(3)
-#     G[1,64,83,100] = torch.eye(3)
-#     G[0,72,41,38] = torch.eye(3)
-#     G[1,72,41,38] = torch.eye(3)
-#     G[0,56,77,40] = torch.eye(3)
-#     G[1,56,77,40] = torch.eye(3)
-    # G[torch.abs(torch.det(G)-1)<=2e-4] = torch.eye((3))
 
     atlas = get_karcher_mean(G, 1./3)
     atlas_mask = atlas_mask/6
@@ -233,12 +228,12 @@ if __name__ == "__main__":
     atlas_lin[4] = atlas_inv[:,:,:,1,2].cpu()
     atlas_lin[5] = atlas_inv[:,:,:,2,2].cpu()
 
-    sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_lin,(3,2,1,0))), f'{output_dir}/atlas_tens_phi_inv_img_met_rreg_800.nhdr')
-    sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_mask.cpu().numpy(),(2,1,0))), f'{output_dir}/atlas_mask_phi_inv_img_met_rreg_800.nhdr')
-    # sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_brain_mask.cpu().numpy(),(2,1,0))), f'{output_dir}/atlas_brain_mask_phi_inv_800.nhdr')
-    sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_img.cpu().numpy(),(2,1,0))), f'{output_dir}/atlas_img_phi_inv_img_met_rreg_800.nhdr')
-
-    # sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_lin,(3,2,1,0))), f'{output_dir}/atlas_tens_phi_inv_met_rreg_800.nhdr')
-    # sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_mask.cpu().numpy(),(2,1,0))), f'{output_dir}/atlas_mask_phi_inv_met_rreg_800.nhdr')
+    # sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_lin,(3,2,1,0))), f'{output_dir}/atlas_tens_phi_inv_img_met_800.nhdr')
+    # sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_mask.cpu().numpy(),(2,1,0))), f'{output_dir}/atlas_mask_phi_inv_img_met_800.nhdr')
     # # sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_brain_mask.cpu().numpy(),(2,1,0))), f'{output_dir}/atlas_brain_mask_phi_inv_800.nhdr')
-    # sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_img.cpu().numpy(),(2,1,0))), f'{output_dir}/atlas_img_phi_inv_met_rreg_800.nhdr')
+    # sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_img.cpu().numpy(),(2,1,0))), f'{output_dir}/atlas_img_phi_inv_img_met_800.nhdr')
+
+    sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_lin,(3,2,1,0))), f'{output_dir}/atlas_tens_phi_inv_met_rreg_800.nhdr')
+    sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_mask.cpu().numpy(),(2,1,0))), f'{output_dir}/atlas_mask_phi_inv_met_rreg_800.nhdr')
+    # sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_brain_mask.cpu().numpy(),(2,1,0))), f'{output_dir}/atlas_brain_mask_phi_inv_800.nhdr')
+    sitk.WriteImage(sitk.GetImageFromArray(np.transpose(atlas_img.cpu().numpy(),(2,1,0))), f'{output_dir}/atlas_img_phi_inv_met_rreg_800.nhdr')

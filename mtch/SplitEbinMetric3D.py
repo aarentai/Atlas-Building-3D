@@ -5,6 +5,7 @@ import warnings
 import matplotlib.pyplot as plt
 from IPython.core.debugger import set_trace
 from math import pi
+import random
 
 '''
 SplitEbinMetric.py stays the same from Atlas2D to Atlas3D
@@ -283,3 +284,37 @@ def get_karcher_mean(G, a):
             gm[Ind_notInRange] = ptPick_notInRange(gm[Ind_notInRange], G[i, Ind_notInRange], i)
 
     return gm.reshape(*size[1:])
+
+
+def get_karcher_mean_shuffle(G, a):
+    size = G.size()
+    G = G.reshape(size[0], -1, *size[-2:])  # (T,-1,3,3)
+
+    orig_list = list(range(G.shape[0]))
+    shuffle_list = orig_list.copy()
+    random.shuffle(shuffle_list)
+    idx_shuffle_map = dict(zip(orig_list, shuffle_list))
+
+    gm = G[idx_shuffle_map[0]]
+
+    for i in range(1, G.size(0)):
+        U = logm_invB_A(gm, G[idx_shuffle_map[i]])
+        UTrless = U - torch.einsum("...ii,kl->...kl", U, torch.eye(size[-1], dtype=torch.double)) / size[
+            -1]  # (...,2,2)
+        theta = ((torch.einsum("...ik,...ki->...", UTrless, UTrless) / a).sqrt() / 4 - np.pi)
+        Ind_inRange = (theta < 0).nonzero().reshape(-1)  ## G[i] is in the range of the exponential map at gm
+        Ind_notInRange = (theta >= 0).nonzero().reshape(-1)  ## G[i] is not in the range
+
+        # when g1 = 0, len(Ind_notInRange) and len(Ind_inRange) are both zero. So check len(Ind_notInRange) first
+        if len(Ind_notInRange) == 0:  # all in the range
+            gm = Rie_Exp_extended(gm, inv_RieExp_extended(gm, G[idx_shuffle_map[i]], a) / (i + 1), a)
+        elif len(Ind_inRange) == 0:  # all not in range
+            gm = ptPick_notInRange(gm, G[idx_shuffle_map[i]], i)
+        else:
+            gm[Ind_inRange] = Rie_Exp_extended(gm[Ind_inRange],
+                                               inv_RieExp_extended(gm[Ind_inRange], G[idx_shuffle_map[i], Ind_inRange], a) / (i + 1),
+                                               a)  # stop here
+            gm[Ind_notInRange] = ptPick_notInRange(gm[Ind_notInRange], G[idx_shuffle_map[i], Ind_notInRange], i)
+
+    return gm.reshape(*size[1:])
+
